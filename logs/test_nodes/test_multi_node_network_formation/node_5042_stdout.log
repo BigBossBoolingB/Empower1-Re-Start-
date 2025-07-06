@@ -1,0 +1,37 @@
+Consensus package initialized.
+Network package initialized.
+ValidatorManager initialized. Min stake for active: 100.0
+ * Serving Flask app 'empower1.network.network'
+ * Debug mode: off
+!!! DBG Node 5042: connect_to_peer called for http://127.0.0.1:5041
+!!! DBG Node 5042: Attempting to add peer http://127.0.0.1:5041
+!!! DBG Node 5042: Added peer http://127.0.0.1:5041. Total: 1. Requesting their peers.
+!!! DBG Node 5042: connect_to_peer called for http://127.0.0.1:5040
+!!! DBG Node 5042: Attempting to add peer http://127.0.0.1:5040
+!!! DBG Node 5042: Added peer http://127.0.0.1:5040. Total: 2. Requesting their peers.
+!!! DBG Node 5042: Checking sync condition after adding http://127.0.0.1:5040. My chain len: 1, Sync in progress: False
+!!! DBG Node 5042: Chain short after adding peer http://127.0.0.1:5040, calling request_chain_from_peer.
+!!! DBG Node 5042: ENTERING request_chain_from_peer for peer http://127.0.0.1:5040
+!!! DBG HCR Node 5042: ENTERING handle_chain_response from peer http://127.0.0.1:5040. Chain length received: 1
+!!! DBG HCR Node 5042: My current chain length: 1. My USER_PUBLIC_KEYS dict ID: 140293349897344, Known keys for: ['Emp1576cdb9a10f761b18ff053fe62fd36f1ed4062dd']
+!!! DBG HCR Node 5042: New node adopting new genesis 586ff78 from validator Emp1ea3a4f3330096a71232bb52ac5f7916803c3ee95.
+!!! DBG HCR Node 5042: Validating prospective block 0, Val: Emp1ea3a4f3330096a71232bb52ac5f7916803c3ee95, Hash: 586ff78
+!!! DBG HCR Node 5042: Missing PK for G validator Emp1ea3a4f3330096a71232bb52ac5f7916803c3ee95. My Keys: ['Emp1576cdb9a10f761b18ff053fe62fd36f1ed4062dd']
+[Emp1576cdb9a10f761b18ff053fe62fd36f1ed4062dd] Received chain from http://127.0.0.1:5040 was invalid during HCR validation.
+!!! DBG Node 5042: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5040
+!!! DBG Node 5042: connect_to_peer called for http://127.0.0.1:5040
+!!! DBG Node 5042: Attempting to add peer http://127.0.0.1:5040
+!!! DBG Node 5042: Peer http://127.0.0.1:5040 is self or already known.
+!!! DBG Node 5042: Checking sync condition after adding http://127.0.0.1:5041. My chain len: 1, Sync in progress: False
+!!! DBG Node 5042: Chain short after adding peer http://127.0.0.1:5041, calling request_chain_from_peer.
+!!! DBG Node 5042: ENTERING request_chain_from_peer for peer http://127.0.0.1:5041
+!!! DBG HCR Node 5042: ENTERING handle_chain_response from peer http://127.0.0.1:5041. Chain length received: 1
+!!! DBG HCR Node 5042: My current chain length: 1. My USER_PUBLIC_KEYS dict ID: 140293349897344, Known keys for: ['Emp1576cdb9a10f761b18ff053fe62fd36f1ed4062dd']
+!!! DBG HCR Node 5042: New node adopting new genesis 98c6ffd from validator Emp199f8e87df291d3527ba9147f87d4757d6306e33d.
+!!! DBG HCR Node 5042: Validating prospective block 0, Val: Emp199f8e87df291d3527ba9147f87d4757d6306e33d, Hash: 98c6ffd
+!!! DBG HCR Node 5042: Missing PK for G validator Emp199f8e87df291d3527ba9147f87d4757d6306e33d. My Keys: ['Emp1576cdb9a10f761b18ff053fe62fd36f1ed4062dd']
+[Emp1576cdb9a10f761b18ff053fe62fd36f1ed4062dd] Received chain from http://127.0.0.1:5041 was invalid during HCR validation.
+!!! DBG Node 5042: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5041
+!!! DBG Node 5042: connect_to_peer called for http://127.0.0.1:5041
+!!! DBG Node 5042: Attempting to add peer http://127.0.0.1:5041
+!!! DBG Node 5042: Peer http://127.0.0.1:5041 is self or already known.

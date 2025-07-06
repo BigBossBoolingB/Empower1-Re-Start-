@@ -104,7 +104,10 @@ def empty_blockchain_real_genesis():
     # It appears Blockchain() constructor does populate these for its genesis validator.
     USER_PUBLIC_KEYS.clear()
     VALIDATOR_WALLETS.clear()
-    return Blockchain()
+    # Blockchain() constructor now requires a node_wallet.
+    fixture_genesis_wallet = Wallet()
+    # The Blockchain constructor will handle populating USER_PUBLIC_KEYS/VALIDATOR_WALLETS for this wallet.
+    return Blockchain(node_wallet=fixture_genesis_wallet)
 
 @pytest.fixture
 def blockchain_with_one_validator(empty_blockchain_real_genesis, validator_wallet):

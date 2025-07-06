@@ -1,0 +1,13 @@
+INFO:werkzeug:[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5042
+INFO:werkzeug:[33mPress CTRL+C to quit[0m
+INFO:werkzeug:127.0.0.1 - - [06/Jul/2025 19:03:11] "GET /ping HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [06/Jul/2025 19:03:11] "GET /ping HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [06/Jul/2025 19:03:11] "GET /GET_PEERS HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [06/Jul/2025 19:03:11] "GET /GET_CHAIN HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [06/Jul/2025 19:03:11] "[35m[1mPOST /NEW_PEER_ANNOUNCE HTTP/1.1[0m" 202 -
+INFO:werkzeug:127.0.0.1 - - [06/Jul/2025 19:03:11] "GET /ping HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [06/Jul/2025 19:03:11] "GET /GET_PEERS HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [06/Jul/2025 19:03:11] "GET /GET_CHAIN HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [06/Jul/2025 19:03:11] "[35m[1mPOST /NEW_PEER_ANNOUNCE HTTP/1.1[0m" 202 -
+INFO:werkzeug:127.0.0.1 - - [06/Jul/2025 19:03:21] "GET /GET_PEERS HTTP/1.1" 200 -

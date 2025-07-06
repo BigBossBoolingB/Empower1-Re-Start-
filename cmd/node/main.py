@@ -64,9 +64,19 @@ def main():
     # print(f"  Address: {node_wallet.address}")
     USER_PUBLIC_KEYS[node_wallet.address] = node_wallet.get_public_key_hex()
 
-    blockchain = Blockchain()
+    blockchain = Blockchain(node_wallet=node_wallet) # Pass node_wallet
     # Pass node_wallet to Network constructor for debug operations
     network_manager = Network(blockchain=blockchain, host=host, port=port, node_id=node_wallet.address, seed_nodes=seed_nodes, node_wallet=node_wallet)
+
+    # --- Added Debug Logging for Node A Initial State ---
+    if port == 5050: # Assuming Node A in the test runs on port 5050
+        print(f"CMD_MAIN_DBG Node {port}: Node Wallet Address: {node_wallet.address}", flush=True)
+        print(f"CMD_MAIN_DBG Node {port}: Blockchain Genesis Validator: {blockchain.genesis_validator_wallet_address}", flush=True)
+        print(f"CMD_MAIN_DBG Node {port}: Balance of Node Wallet: {blockchain.balances.get(node_wallet.address)}", flush=True)
+        print(f"CMD_MAIN_DBG Node {port}: Balance of Genesis Validator: {blockchain.balances.get(blockchain.genesis_validator_wallet_address)}", flush=True)
+        print(f"CMD_MAIN_DBG Node {port}: Is Node Wallet the Genesis Validator? {node_wallet.address == blockchain.genesis_validator_wallet_address}", flush=True)
+    # --- End Added Debug Logging ---
+
     # blockchain.network_interface = network_manager # Network constructor handles this now
 
     network_manager.start_server(threaded=True)

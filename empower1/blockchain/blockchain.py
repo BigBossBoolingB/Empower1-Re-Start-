@@ -13,7 +13,8 @@ from empower1.consensus.manager import ValidatorManager # Remains absolute, sibl
 class Blockchain:
     NATIVE_CURRENCY_SYMBOL = "EPC" # Define native currency symbol
 
-    def __init__(self, network_interface=None):
+    def __init__(self, node_wallet: Wallet, network_interface=None): # Added node_wallet parameter
+        self.node_wallet = node_wallet # Store the provided node_wallet
         self.chain = []
         self.pending_transactions = []
         self.validator_manager = ValidatorManager()
@@ -21,35 +22,39 @@ class Blockchain:
 
         self.balances: Dict[str, float] = {}
         self.total_supply_epc: float = 0.0
-        self.genesis_validator_wallet_address: str = None # Store for access
-        self.genesis_validator_public_key_hex: str = None # Store for access
 
-        self._create_and_sign_genesis_block()
+        # Set these based on the provided node_wallet
+        self.genesis_validator_wallet_address = self.node_wallet.address
+        self.genesis_validator_public_key_hex = self.node_wallet.get_public_key_hex()
+
+        self._create_and_sign_genesis_block() # This will now use self.node_wallet
 
     def _create_and_sign_genesis_block(self):
-        genesis_validator_wallet = Wallet()
-        self.genesis_validator_wallet_address = genesis_validator_wallet.address
-        self.genesis_validator_public_key_hex = genesis_validator_wallet.get_public_key_hex()
-
-        VALIDATOR_WALLETS[self.genesis_validator_wallet_address] = genesis_validator_wallet
-        USER_PUBLIC_KEYS[self.genesis_validator_wallet_address] = self.genesis_validator_public_key_hex
+        # No longer create a new Wallet here; use self.node_wallet
+        # Ensure its PK and wallet object are in the global maps
+        if self.node_wallet.address not in VALIDATOR_WALLETS: # Avoid re-adding if already there from other init
+            VALIDATOR_WALLETS[self.node_wallet.address] = self.node_wallet
+        if self.node_wallet.address not in USER_PUBLIC_KEYS:
+            USER_PUBLIC_KEYS[self.node_wallet.address] = self.node_wallet.get_public_key_hex()
 
         genesis_block = Block(
             index=0,
             transactions=[],
             timestamp=time.time(),
             previous_hash="0",
-            validator_address=genesis_validator_wallet.address,
-            proof={"type": "Genesis", "validator": genesis_validator_wallet.address, "details": "initial_block_proof_v1"} # Updated Genesis proof placeholder
+            validator_address=self.node_wallet.address, # Use self.node_wallet's address
+            proof={"type": "Genesis", "validator": self.node_wallet.address, "details": "initial_block_proof_v1"}
         )
-        genesis_block.sign_block(genesis_validator_wallet)
+        genesis_block.sign_block(self.node_wallet) # Sign with self.node_wallet
         self.chain.append(genesis_block)
 
         initial_supply_epc = 1_000_000.0
-        genesis_validator_address = genesis_validator_wallet.address
-        self.balances[genesis_validator_address] = initial_supply_epc
+        # Fund the self.node_wallet (which is the genesis validator)
+        self.balances[self.node_wallet.address] = initial_supply_epc
         self.total_supply_epc = initial_supply_epc
-        print(f"Initial {initial_supply_epc} {self.NATIVE_CURRENCY_SYMBOL} allocated to genesis validator {genesis_validator_address}.")
+        logging.info(f"GENESIS_DBG: Initial {initial_supply_epc} {self.NATIVE_CURRENCY_SYMBOL} allocated to genesis validator {self.node_wallet.address}. Balance: {self.balances[self.node_wallet.address]}")
+        logging.info(f"GENESIS_DBG: USER_PUBLIC_KEYS after genesis wallet init: {list(USER_PUBLIC_KEYS.keys())}")
+        logging.info(f"GENESIS_DBG: VALIDATOR_WALLETS after genesis wallet init: {list(VALIDATOR_WALLETS.keys())}")
 
     @property
     def last_block(self) -> Block:

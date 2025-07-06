@@ -186,7 +186,9 @@ def test_mine_pending_transactions_skips_invalid_epc_tx_insufficient_funds(block
     assert not bc.pending_transactions
 
 def test_is_chain_valid_crypto_focus(alice_wallet, bob_wallet):
-    bc_for_validation_test = Blockchain()
+    # Create a wallet to be used by this specific blockchain instance for its genesis
+    bc_node_wallet = Wallet()
+    bc_for_validation_test = Blockchain(node_wallet=bc_node_wallet)
     val_for_test = Wallet()
     bc_for_validation_test.register_validator_wallet(val_for_test, 1000.0)
     USER_PUBLIC_KEYS[val_for_test.address] = val_for_test.get_public_key_hex()

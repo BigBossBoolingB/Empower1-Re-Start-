@@ -1,0 +1,5 @@
+Consensus package initialized.
+Network package initialized.
+ValidatorManager initialized. Min stake for active: 100.0
+ * Serving Flask app 'empower1.network.network'
+ * Debug mode: off

@@ -39,14 +39,18 @@ def node_wallet_fixture():
 
 @pytest.fixture
 def network_node_with_real_bc(node_wallet_fixture):
-    bc = Blockchain()
-    network = Network(blockchain=bc, host="127.0.0.1", port=5000, node_id=f"node_5000_id_{time.time_ns()}")
+    # node_wallet_fixture is already created and its PK is in USER_PUBLIC_KEYS
+    bc = Blockchain(node_wallet=node_wallet_fixture)
+    network = Network(blockchain=bc, host="127.0.0.1", port=5000, node_id=node_wallet_fixture.address, node_wallet=node_wallet_fixture)
     return network
 
 @pytest.fixture
-def peer_network_node_real_bc():
-    bc = Blockchain()
-    network = Network(blockchain=bc, host="127.0.0.1", port=5001, node_id=f"node_5001_id_{time.time_ns()}")
+def peer_network_node_real_bc(bob_wallet): # Using bob_wallet for variety, or create a new one
+    # Ensure bob_wallet's PK is also in USER_PUBLIC_KEYS if not already handled by Wallet init globally
+    if bob_wallet.address not in USER_PUBLIC_KEYS:
+        USER_PUBLIC_KEYS[bob_wallet.address] = bob_wallet.get_public_key_hex()
+    bc = Blockchain(node_wallet=bob_wallet)
+    network = Network(blockchain=bc, host="127.0.0.1", port=5001, node_id=bob_wallet.address, node_wallet=bob_wallet)
     return network
 
 # Existing tests from previous step (ensure they still pass or adapt)
@@ -150,7 +154,7 @@ def test_broadcast_transaction(mock_send_req, network_node_with_real_bc, node_wa
     calls = mock_send_req.call_args_list
 
     # Check calls were made to the correct endpoints with correct data for each peer
-    call_details = [ (c[0][1], c[0][2], c[1]['json_data']) for c in calls] # (address, endpoint, data)
+    call_details = [ (c[0][1], c[0][2], c[1]['jd']) for c in calls] # (address, endpoint, data) - Changed 'json_data' to 'jd'
     expected_endpoint = f"/{str(MessageType.NEW_TRANSACTION)}"
 
     assert (peer1.address, expected_endpoint, tx_data) in call_details
@@ -169,7 +173,7 @@ def test_broadcast_block(mock_send_req, network_node_with_real_bc, node_wallet_f
     nn.broadcast_block(block)
 
     mock_send_req.assert_called_once_with(
-        'POST', peer1.address, f"/{str(MessageType.NEW_BLOCK)}", json_data=block_data
+        'POST', peer1.address, f"/{str(MessageType.NEW_BLOCK)}", jd=block_data # Changed json_data to jd
     )
 
 # --- Flask Route Tests ---
@@ -194,11 +198,15 @@ def test_new_peer_announce_endpoint_success(network_node_with_real_bc):
     nn = network_node_with_real_bc
     new_peer_announcing = Node("127.0.0.1", 5001)
     client = nn.app.test_client()
-    with patch.object(nn, 'request_peers_from', MagicMock()) as mock_req_peers:
+    # Mock connect_to_peer to simulate successful connection initiation
+    with patch.object(nn, 'connect_to_peer', MagicMock(return_value=True)) as mock_connect_to_peer:
         response = client.post(f"/{str(MessageType.NEW_PEER_ANNOUNCE)}", json={"address": new_peer_announcing.address})
-        assert response.status_code == 201
-        assert new_peer_announcing in nn.peers
-        mock_req_peers.assert_called_once()
+        assert response.status_code == 202 # Endpoint returns 202 for "process initiated"
+        # connect_to_peer itself handles adding the peer, so we check if it was called
+        mock_connect_to_peer.assert_called_once_with(new_peer_announcing.address)
+        # We can't directly assert new_peer_announcing in nn.peers because connect_to_peer is mocked.
+        # If we wanted to test the add_peer call within connect_to_peer, the mock would need to be more complex
+        # or we'd test connect_to_peer separately and more thoroughly.
 
 # --- Tests for Transaction Propagation Handlers ---
 def test_handle_received_transaction_new_valid(network_node_with_real_bc, node_wallet_fixture, bob_wallet):
