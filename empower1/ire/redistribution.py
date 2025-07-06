@@ -1,6 +1,6 @@
 # Core logic for the Intelligent Redistribution Engine (IRE)
 
-from empower1.transaction import Transaction
+from empower1.blockchain.transaction import Transaction # Updated path
 from empower1.ire.ai_model import IREDecisionModel
 # It might need access to blockchain state or user account data,
 # which would require careful consideration of dependencies and interfaces.

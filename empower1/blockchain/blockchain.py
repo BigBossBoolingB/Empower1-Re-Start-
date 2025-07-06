@@ -1,13 +1,14 @@
 import time
 from typing import Dict
-from empower1.block import Block
-from empower1.transaction import Transaction
-from empower1.wallet import Wallet
+from .block import Block  # Updated to relative import
+from .transaction import Transaction  # Updated to relative import
+from .wallet import Wallet  # Updated to relative import
+import logging # Added import logging
 
 USER_PUBLIC_KEYS = {}
 VALIDATOR_WALLETS = {}
 
-from empower1.consensus.manager import ValidatorManager
+from empower1.consensus.manager import ValidatorManager # Remains absolute, sibling package
 
 class Blockchain:
     NATIVE_CURRENCY_SYMBOL = "EPC" # Define native currency symbol
@@ -20,20 +21,26 @@ class Blockchain:
 
         self.balances: Dict[str, float] = {}
         self.total_supply_epc: float = 0.0
+        self.genesis_validator_wallet_address: str = None # Store for access
+        self.genesis_validator_public_key_hex: str = None # Store for access
 
         self._create_and_sign_genesis_block()
 
     def _create_and_sign_genesis_block(self):
         genesis_validator_wallet = Wallet()
-        VALIDATOR_WALLETS[genesis_validator_wallet.address] = genesis_validator_wallet
-        USER_PUBLIC_KEYS[genesis_validator_wallet.address] = genesis_validator_wallet.get_public_key_hex()
+        self.genesis_validator_wallet_address = genesis_validator_wallet.address
+        self.genesis_validator_public_key_hex = genesis_validator_wallet.get_public_key_hex()
+
+        VALIDATOR_WALLETS[self.genesis_validator_wallet_address] = genesis_validator_wallet
+        USER_PUBLIC_KEYS[self.genesis_validator_wallet_address] = self.genesis_validator_public_key_hex
 
         genesis_block = Block(
             index=0,
             transactions=[],
             timestamp=time.time(),
             previous_hash="0",
-            validator_address=genesis_validator_wallet.address
+            validator_address=genesis_validator_wallet.address,
+            proof={"type": "Genesis", "validator": genesis_validator_wallet.address, "details": "initial_block_proof_v1"} # Updated Genesis proof placeholder
         )
         genesis_block.sign_block(genesis_validator_wallet)
         self.chain.append(genesis_block)
@@ -85,9 +92,16 @@ class Blockchain:
         if not all(hasattr(transaction, attr) for attr in ['sender_address', 'receiver_address', 'amount']):
             return False
 
-        if not transaction.verify_signature(sender_public_key_hex):
-            print(f"Error: Invalid signature for transaction {transaction.transaction_id} from {transaction.sender_address}.")
+        import logging # Make sure logging is imported if not already at module top
+        logging.debug(f"Add_transaction: Verifying sig for tx {transaction.transaction_id} from {transaction.sender_address} with PK {sender_public_key_hex[:10]}...")
+        sig_valid = transaction.verify_signature(sender_public_key_hex)
+        if not sig_valid:
+            logging.error(f"Add_transaction: Invalid signature for transaction {transaction.transaction_id} from {transaction.sender_address}. PK used: {sender_public_key_hex[:10]}...")
+            # For debugging, let's see what USER_PUBLIC_KEYS has for this address
+            known_pk = USER_PUBLIC_KEYS.get(transaction.sender_address)
+            logging.error(f"Add_transaction: For sender {transaction.sender_address}, USER_PUBLIC_KEYS has: {known_pk[:10] if known_pk else 'None'}")
             return False
+        logging.debug(f"Add_transaction: Signature VERIFIED for tx {transaction.transaction_id}")
 
         # Pre-check for sufficient funds (against current confirmed balances) before adding to pending pool
         if transaction.asset_id == self.NATIVE_CURRENCY_SYMBOL:
@@ -112,22 +126,24 @@ class Blockchain:
             self.network_interface.broadcast_transaction(transaction)
         return True
 
-    def mine_pending_transactions(self) -> Block | None:
+    def mine_pending_transactions(self) -> Block | None: # No docstring to update for this method
         selected_validator_obj = self.validator_manager.select_next_validator()
         if not selected_validator_obj:
-            print("Error: No active validator selected to mine the block.")
+            print(f"DEBUG MINE: No active validator selected. ValidatorManager active list: {self.validator_manager._active_validator_addresses_round_robin}")
             return None
 
         selected_validator_address = selected_validator_obj.wallet_address
+        print(f"DEBUG MINE: Selected validator: {selected_validator_address}")
         validator_wallet = VALIDATOR_WALLETS.get(selected_validator_address)
 
         if not validator_wallet:
-            print(f"Error: Wallet for selected validator {selected_validator_address} not found.")
+            print(f"DEBUG MINE: Wallet for selected validator {selected_validator_address} not found in VALIDATOR_WALLETS global. Known: {list(VALIDATOR_WALLETS.keys())}")
             return None
 
         if not self.pending_transactions:
-            print(f"No pending transactions for validator {selected_validator_address} to mine.")
+            print(f"DEBUG MINE: No pending transactions for validator {selected_validator_address} to mine.")
             return None
+        print(f"DEBUG MINE: {len(self.pending_transactions)} pending transactions found.")
 
         # Create a temporary balance snapshot to validate transactions for this block
         # This snapshot starts from the current confirmed balances.
@@ -157,7 +173,8 @@ class Blockchain:
             transactions=valid_txs_for_block,
             timestamp=time.time(),
             previous_hash=self.last_block.hash if self.last_block else "0",
-            validator_address=selected_validator_address
+            validator_address=selected_validator_address,
+            proof={"type": "Proof-of-Stake", "validator": selected_validator_address, "details": "placeholder_pos_proof_v1"} # Updated PoS proof placeholder
         )
         new_block.sign_block(validator_wallet)
 
@@ -182,6 +199,17 @@ class Blockchain:
         return new_block
 
     def is_chain_valid(self) -> bool:
+        """
+        Validates the entire blockchain. Checks include:
+        - Block hash integrity (recalculating hash based on content, including 'proof').
+        - Previous hash linkage.
+        - Validator signature on each block.
+        - Transaction signatures within each block.
+        - Replays transactions to ensure balance consistency.
+
+        Returns:
+            bool: True if the chain is valid, False otherwise.
+        """
         temp_balances_for_validation = {}
         # Properly initialize temp_balances with the actual genesis allocation
         if self.chain:
@@ -199,8 +227,10 @@ class Blockchain:
 
         for i in range(len(self.chain)):
             current_block = self.chain[i]
-            if current_block.hash != current_block._calculate_block_hash():
-                print(f"Error: Block {current_block.index} has an invalid hash.")
+            # The block's hash is calculated on instantiation and stored in self.hash
+            # To validate, we re-calculate based on its current content and compare.
+            if current_block.hash != current_block.calculate_hash(): # Updated call
+                print(f"Error: Block {current_block.index} has an invalid hash. Stored: {current_block.hash}, Recalculated: {current_block.calculate_hash()}")
                 return False
 
             if i > 0:

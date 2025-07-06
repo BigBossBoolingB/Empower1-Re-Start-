@@ -1,0 +1,6 @@
+Consensus package initialized.
+Network package initialized.
+ValidatorManager initialized. Min stake for active: 100.0
+Initial 1000000.0 EPC allocated to genesis validator Emp13ecdd970e5f4672726dc29ad0d94871bab2d5c20.
+ * Serving Flask app 'empower1.network.network'
+ * Debug mode: off

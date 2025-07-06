@@ -1,11 +1,11 @@
 import pytest
 import time
 from unittest.mock import patch
-from empower1.blockchain import Blockchain, USER_PUBLIC_KEYS, VALIDATOR_WALLETS
-from empower1.block import Block
-from empower1.transaction import Transaction
-from empower1.consensus.manager import ValidatorManager
-from empower1.wallet import Wallet
+from empower1.blockchain.blockchain import Blockchain, USER_PUBLIC_KEYS, VALIDATOR_WALLETS
+from empower1.blockchain.block import Block
+from empower1.blockchain.transaction import Transaction
+from empower1.consensus.manager import ValidatorManager # This should be correct
+from empower1.blockchain.wallet import Wallet
 
 # Test Blockchain initialization with crypto-signed Genesis
 def test_blockchain_initialization_crypto(empty_blockchain_real_genesis):
@@ -16,6 +16,8 @@ def test_blockchain_initialization_crypto(empty_blockchain_real_genesis):
     assert genesis_block.previous_hash == "0"
     assert genesis_block.validator_address is not None
     assert genesis_block.signature_hex is not None
+    assert genesis_block.proof is not None # Check that proof exists
+    assert genesis_block.proof == {"type": "Genesis", "validator": genesis_block.validator_address, "details": "initial_block_proof_v1"} # Check specific genesis proof
 
     genesis_validator_pub_key = USER_PUBLIC_KEYS.get(genesis_block.validator_address)
     assert genesis_validator_pub_key is not None

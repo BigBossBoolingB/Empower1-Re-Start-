@@ -2,8 +2,8 @@ import pytest
 import time
 import hashlib
 import json
-from empower1.transaction import Transaction
-from empower1.wallet import Wallet # Needed for signing
+from empower1.blockchain.transaction import Transaction
+from empower1.blockchain.wallet import Wallet # Needed for signing
 
 # Test basic Transaction creation and attributes with new crypto integration
 def test_transaction_creation_crypto(alice_wallet, bob_wallet):

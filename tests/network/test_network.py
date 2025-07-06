@@ -5,11 +5,11 @@ import requests # Added for requests.exceptions
 
 from empower1.network.network import Network
 from empower1.network.messages import MessageType
-from empower1.block import Block
+from empower1.blockchain.block import Block
 from empower1.network.node import Node
-from empower1.blockchain import Blockchain, USER_PUBLIC_KEYS, VALIDATOR_WALLETS
-from empower1.transaction import Transaction
-from empower1.wallet import Wallet
+from empower1.blockchain.blockchain import Blockchain, USER_PUBLIC_KEYS, VALIDATOR_WALLETS
+from empower1.blockchain.transaction import Transaction
+from empower1.blockchain.wallet import Wallet
 
 # --- Helper to create a basic, signed transaction ---
 def create_signed_transaction(sender_wallet: Wallet, receiver_address: str, amount: float = 1.0, asset_id: str = "EMP") -> Transaction:
@@ -20,7 +20,7 @@ def create_signed_transaction(sender_wallet: Wallet, receiver_address: str, amou
 
 # --- Helper to create a basic, signed block ---
 def create_signed_block(index: int, prev_hash: str, transactions: list, validator_wallet: Wallet) -> Block:
-    block = Block(index, transactions, time.time(), prev_hash, validator_wallet.address)
+    block = Block(index, transactions, time.time(), prev_hash, validator_wallet.address, proof=f"test_proof_idx_{index}")
     block.sign_block(validator_wallet)
     USER_PUBLIC_KEYS[validator_wallet.address] = validator_wallet.get_public_key_hex()
     VALIDATOR_WALLETS[validator_wallet.address] = validator_wallet

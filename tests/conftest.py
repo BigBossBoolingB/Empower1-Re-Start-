@@ -3,10 +3,10 @@ import time
 import random
 from unittest.mock import patch # Added
 
-from empower1.wallet import Wallet
-from empower1.transaction import Transaction
-from empower1.block import Block
-from empower1.blockchain import Blockchain, USER_PUBLIC_KEYS, VALIDATOR_WALLETS
+from empower1.blockchain.wallet import Wallet
+from empower1.blockchain.transaction import Transaction
+from empower1.blockchain.block import Block
+from empower1.blockchain.blockchain import Blockchain, USER_PUBLIC_KEYS, VALIDATOR_WALLETS
 
 # This file (conftest.py) is used by pytest to share fixtures across multiple test files.
 
@@ -84,7 +84,8 @@ def sample_block_signed(genesis_block_from_blockchain, sample_transaction_signed
         transactions=[sample_transaction_signed, another_sample_transaction_signed],
         timestamp=time.time() + 10, # Ensure later than genesis
         previous_hash=genesis_block_from_blockchain.hash,
-        validator_address=validator_wallet.address # Validator's wallet address
+        validator_address=validator_wallet.address, # Validator's wallet address
+        proof="sample_proof_from_conftest" # Added proof argument
     )
     block.sign_block(validator_wallet) # Validator signs the block
     return block

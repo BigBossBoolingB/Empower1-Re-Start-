@@ -78,7 +78,7 @@ The implications of EmPower1 Blockchain extend far beyond traditional finance an
 **Current Status:** This project is in its early stages of development. The codebase provides a foundational (non-production-ready) simulation of the EmPower1 Blockchain concepts. Key functionalities are placeholders and will be significantly enhanced.
 
 ### 5.1. What's Implemented (Simulated):
-*   **Core Blockchain Structure:** `Block`, `Transaction`, `Blockchain`, and `Wallet` classes with ECDSA cryptographic signing and verification.
+*   **Core Blockchain Structure:** `Block` (includes index, transactions, timestamp, previous_hash, validator_address, proof), `Transaction`, `Blockchain`, and `Wallet` classes with ECDSA cryptographic signing and verification. Block hashing is standardized using `json.dumps` of its core attributes.
 *   **Proof-of-Stake (PoS) Basics:**
     *   `Validator` class to store validator data (pubkey, stake, active status).
     *   `ValidatorManager` to manage the validator set, handle staking (conceptual, in-memory), and select block producers using a round-robin strategy among active validators.
@@ -129,10 +129,13 @@ The implications of EmPower1 Blockchain extend far beyond traditional finance an
     ```
 
 6.  **Explore the Code:**
-    *   Core blockchain logic: `empower1/` (start with `blockchain.py`, `wallet.py`, `transaction.py`, `block.py`).
-    *   Networking logic: `empower1/network/` (start with `network.py`, `node.py`).
+    *   Core blockchain logic: `empower1/blockchain/` (see `blockchain.py`, `wallet.py`, `transaction.py`, `block.py`).
+    *   Consensus logic: `empower1/consensus/`
+    *   Networking logic: `empower1/network/`
+    *   IRE placeholders: `empower1/ire/`
+    *   Smart Contract placeholders: `empower1/smart_contracts/`
     *   Command-line node application: `cmd/node/main.py`.
-    *   Tests: `tests/` directory.
+    *   Tests: `tests/` directory (mirrors `empower1` structure, e.g., `tests/blockchain/`, `tests/consensus/`).
 
 7.  **Running a Node:**
     You can start an EmPower1 node using the command-line application:

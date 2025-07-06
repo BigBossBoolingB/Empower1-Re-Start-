@@ -1,8 +1,8 @@
 import time
 import json # For deterministic serialization of transactions list
 import hashlib
-from empower1.transaction import Transaction # Assuming Transaction class is defined
-from empower1.wallet import Wallet # For type hinting if validator signs
+from .transaction import Transaction # Updated to relative import
+from .wallet import Wallet # Updated to relative import
 
 class Block:
     """
@@ -10,7 +10,7 @@ class Block:
     A block contains a list of transactions and is signed by its validator.
     """
     def __init__(self, index: int, transactions: list[Transaction], timestamp: float,
-                 previous_hash: str, validator_address: str, signature_hex: str = None):
+                 previous_hash: str, validator_address: str, proof: any, signature_hex: str = None):
         """
         Constructor for a Block.
         Args:
@@ -19,53 +19,47 @@ class Block:
             timestamp (float): The time the block was created.
             previous_hash (str): The hash of the preceding block.
             validator_address (str): The address of the validator who created/validated this block.
-                                     This should be the validator's public key hex or wallet address.
+            proof (any): The proof associated with the consensus mechanism (e.g., PoS proof).
+                         This field is included in the block's hash.
             signature_hex (str, optional): Hex-encoded DER signature of the block's hash by the validator.
         """
         self.index = index
+        self.timestamp = timestamp # Ensure this is set before transactions for consistent __dict__ order if not sorted
         self.transactions = transactions # List of Transaction objects
-        self.timestamp = timestamp
+        self.proof = proof
         self.previous_hash = previous_hash
-        self.validator_address = validator_address # Validator's public key (hex) or wallet address
+        self.validator_address = validator_address
 
         # Signature is for the block's hash, set after hash calculation and signing
         self.signature_hex = signature_hex
 
-        # Calculate block hash. It depends on all above fields including transaction details.
-        self.hash = self._calculate_block_hash()
+        # Calculate block hash. It depends on all above fields (excluding signature_hex and hash itself).
+        self.hash = self.calculate_hash()
 
-    def _get_transaction_hashes_for_merkle_or_hash(self) -> str:
-        """
-        Helper to get a string representation of transaction IDs for block hashing.
-        For a real Merkle root, this would be more complex.
-        For now, concatenates transaction_ids (which are hashes of tx content).
-        """
-        if not self.transactions:
-            return ""
-        # Ensure transactions are Transaction objects and have a transaction_id
-        return "".join(tx.transaction_id for tx in self.transactions if hasattr(tx, 'transaction_id'))
 
-    def get_data_for_block_hashing(self) -> bytes:
+    def calculate_hash(self) -> str:
         """
-        Serializes essential block information (excluding the block's own hash and signature)
-        into a deterministic byte string for calculating the block's hash.
+        Calculates the SHA256 hash of the block's content using json.dumps on a dictionary
+        of its attributes (index, timestamp, transactions, proof, previous_hash, validator_address),
+        ensuring deterministic hashing.
+        The block's own `hash` and `signature_hex` attributes are NOT included in this calculation.
+        Transactions are serialized to their dictionary representation.
         """
-        # Using json.dumps for transactions list to ensure deterministic representation if it contains dicts,
-        # but self.transactions should be a list of Transaction objects.
-        # We'll use the concatenated transaction IDs for simplicity as a 'fingerprint' of transactions.
-        transaction_fingerprint = self._get_transaction_hashes_for_merkle_or_hash()
+        # Create a dictionary of attributes to be included in the hash
+        block_dict_for_hashing = {
+            "index": self.index,
+            "timestamp": self.timestamp,
+            # Serialize transactions to ensure deterministic representation
+            "transactions": [tx.to_dict() for tx in self.transactions],
+            "proof": self.proof,
+            "previous_hash": self.previous_hash,
+            "validator_address": self.validator_address
+            # self.hash and self.signature_hex are NOT included here
+        }
 
-        block_header_data = (
-            f"{self.index}{self.timestamp:.6f}{self.previous_hash}"
-            f"{self.validator_address}{transaction_fingerprint}"
-        )
-        return block_header_data.encode('utf-8')
-
-    def _calculate_block_hash(self) -> str:
-        """
-        Calculates the SHA256 hash of the block's content (header + transaction fingerprint).
-        """
-        return hashlib.sha256(self.get_data_for_block_hashing()).hexdigest()
+        # Use json.dumps with sort_keys=True for a deterministic string representation
+        block_string = json.dumps(block_dict_for_hashing, sort_keys=True).encode('utf-8')
+        return hashlib.sha256(block_string).hexdigest()
 
     # For block signing by validator:
     # The data to be signed by the validator is typically the block's own hash.
@@ -122,18 +116,21 @@ class Block:
             return False
 
     def __repr__(self):
-        return (f"Block(Index: {self.index}, Transactions: {len(self.transactions)}, "
+        return (f"Block(Index: {self.index}, Transactions: {len(self.transactions)}, Proof: {self.proof}, "
                 f"Timestamp: {self.timestamp}, Hash: {self.hash[:10]}..., Prev_Hash: {self.previous_hash[:10] if self.previous_hash else 'None'}..., "
                 f"Validator: {self.validator_address}, Signed: {'Yes' if self.signature_hex else 'No'})")
 
     def to_dict(self) -> dict:
-        """Returns a dictionary representation of the block."""
+        """
+        Returns a dictionary representation of the block, including the proof field.
+        """
         return {
             "index": self.index,
             "transactions": [tx.to_dict() for tx in self.transactions], # Convert transactions to dicts
             "timestamp": self.timestamp,
             "previous_hash": self.previous_hash,
             "validator_address": self.validator_address,
+            "proof": self.proof, # Added proof
             "signature_hex": self.signature_hex,
             "hash": self.hash
         }
@@ -144,7 +141,8 @@ class Block:
         Creates a Block instance from a dictionary.
         Assumes transaction data within block_data['transactions'] are also dicts
         that can be converted by Transaction.from_dict().
-        The block's hash will be recalculated based on its content.
+        The 'proof' field is expected in block_data.
+        The block's hash will be recalculated based on its content by __init__.
         """
         # Deserialize transactions first
         transactions_from_data = []
@@ -158,13 +156,13 @@ class Block:
                     # Decide if this is fatal for block creation or if block can be created with partial/no txs
                     raise ValueError(f"Invalid transaction data in block: {e}") from e
 
-
         return cls(
             index=block_data['index'],
             transactions=transactions_from_data,
             timestamp=block_data['timestamp'],
             previous_hash=block_data['previous_hash'],
             validator_address=block_data['validator_address'],
+            proof=block_data.get('proof'), # Added proof, use .get for backward compatibility if proof is optional
             signature_hex=block_data.get('signature_hex') # Signature can be None if block is not yet signed
         )
 
@@ -201,7 +199,8 @@ if __name__ == '__main__':
         transactions=[],
         timestamp=time.time(),
         previous_hash="0", # Genesis block has no previous hash
-        validator_address=genesis_block_validator_wallet.address # Genesis validator address
+        validator_address=genesis_block_validator_wallet.address, # Genesis validator address
+        proof="genesis_proof_main"
     )
     # Genesis block might be pre-signed or have a known signature/no signature
     # For this demo, let's sign it.
@@ -218,7 +217,8 @@ if __name__ == '__main__':
         transactions=[tx1, tx2], # List of signed Transaction objects
         timestamp=block2_timestamp,
         previous_hash=genesis_block.hash,
-        validator_address=validator_x_wallet.address # ValidatorX's address
+        validator_address=validator_x_wallet.address, # ValidatorX's address
+        proof="block2_proof_main"
     )
     print(f"\nBlock 2 (unsigned): {block2}")
     print(f"Block 2 Hash: {block2.hash}")
@@ -244,8 +244,9 @@ if __name__ == '__main__':
     if block2.transactions:
         block2.transactions[0].amount = 999.0 # Tamper
 
-    recalculated_hash_after_tamper = block2._calculate_block_hash()
-    print(f"\nBlock 2 original hash: {block2.hash}")
+    # After tampering, a new call to calculate_hash() on the *current state* of block2 will yield a different hash
+    recalculated_hash_after_tamper = block2.calculate_hash()
+    print(f"\nBlock 2 original hash: {block2.hash}") # This is the hash stored from __init__
     print(f"Block 2 recalculated hash after tampering tx: {recalculated_hash_after_tamper}")
     assert block2.hash != recalculated_hash_after_tamper
 

@@ -1,7 +1,7 @@
 import time
 import json # For deterministic serialization of metadata
 import hashlib
-from empower1.wallet import Wallet # For type hinting and using Wallet's static verify method
+from .wallet import Wallet # Updated to relative import
 
 class Transaction:
     """

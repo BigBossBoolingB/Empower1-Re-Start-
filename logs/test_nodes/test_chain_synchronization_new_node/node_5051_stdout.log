@@ -1,0 +1,28 @@
+Consensus package initialized.
+Network package initialized.
+ValidatorManager initialized. Min stake for active: 100.0
+Initial 1000000.0 EPC allocated to genesis validator Emp170b1ff7e541a93bdb0bc849b0126753c6c6de89e.
+ * Serving Flask app 'empower1.network.network'
+ * Debug mode: off
+!!! DBG Node 5051: Received /debug_add_user_public_key for Emp13146763148cdd5b1ba1db1984a33c74595a7b58a
+!!! DBG Node 5051: USER_PUBLIC_KEYS dict ID: 140665665190912, Now contains: ['Emp1647ba8eda3c3e0368a0650241afe3d8068f588b2', 'Emp170b1ff7e541a93bdb0bc849b0126753c6c6de89e', 'Emp13146763148cdd5b1ba1db1984a33c74595a7b58a']
+!!! DBG Node 5051: Received /debug_add_user_public_key for Emp1ea86c3e7cdc1d4d7345befd0a6163c41c793e361
+!!! DBG Node 5051: USER_PUBLIC_KEYS dict ID: 140665665190912, Now contains: ['Emp1647ba8eda3c3e0368a0650241afe3d8068f588b2', 'Emp170b1ff7e541a93bdb0bc849b0126753c6c6de89e', 'Emp13146763148cdd5b1ba1db1984a33c74595a7b58a', 'Emp1ea86c3e7cdc1d4d7345befd0a6163c41c793e361']
+!!! DBG Node 5051: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5050
+!!! DBG Node 5051: connect_to_peer called for http://127.0.0.1:5050
+!!! DBG Node 5051: Attempting to add peer http://127.0.0.1:5050
+!!! DBG Node 5051: Added peer http://127.0.0.1:5050. Total: 1. Requesting their peers.
+!!! DBG Node 5051: Checking sync condition after adding http://127.0.0.1:5050. My chain len: 1, Sync in progress: False
+!!! DBG Node 5051: Chain short after adding peer http://127.0.0.1:5050, calling request_chain_from_peer.
+!!! DBG Node 5051: ENTERING request_chain_from_peer for peer http://127.0.0.1:5050
+!!! DBG HCR Node 5051: ENTERING handle_chain_response from peer http://127.0.0.1:5050. Chain length received: 3
+!!! DBG HCR Node 5051: My current chain length: 1. My USER_PUBLIC_KEYS dict ID: 140665665190912, Known keys for: ['Emp1647ba8eda3c3e0368a0650241afe3d8068f588b2', 'Emp170b1ff7e541a93bdb0bc849b0126753c6c6de89e', 'Emp13146763148cdd5b1ba1db1984a33c74595a7b58a', 'Emp1ea86c3e7cdc1d4d7345befd0a6163c41c793e361']
+!!! DBG HCR Node 5051: New node adopting new genesis 15d158f from validator Emp1ea86c3e7cdc1d4d7345befd0a6163c41c793e361.
+!!! DBG HCR Node 5051: Validating prospective block 0, Val: Emp1ea86c3e7cdc1d4d7345befd0a6163c41c793e361, Hash: 15d158f
+!!! DBG HCR Node 5051: Validating prospective block 1, Val: Emp13146763148cdd5b1ba1db1984a33c74595a7b58a, Hash: 887efdf
+!!! DBG HCR Node 5051: Insuff funds Tx 7a455ec in B1 (Bal:0.0 Amt:1.5)
+[Emp1647ba8eda3c3e0368a0650241afe3d8068f588b2] Received chain from http://127.0.0.1:5050 was invalid during HCR validation.
+!!! DBG Node 5051: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5050
+!!! DBG Node 5051: connect_to_peer called for http://127.0.0.1:5050
+!!! DBG Node 5051: Attempting to add peer http://127.0.0.1:5050
+!!! DBG Node 5051: Peer http://127.0.0.1:5050 is self or already known.

@@ -1,5 +1,5 @@
 import pytest
-from empower1.wallet import Wallet
+from empower1.blockchain.wallet import Wallet
 import hashlib
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import ec

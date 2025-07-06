@@ -3,21 +3,24 @@ import time
 from flask import Flask, request, jsonify
 import requests
 
-from empower1.blockchain import Blockchain, USER_PUBLIC_KEYS, VALIDATOR_WALLETS
-from empower1.transaction import Transaction
-from empower1.block import Block
-from empower1.network.node import Node
-from empower1.network.messages import MessageType
+from empower1.blockchain.blockchain import Blockchain, USER_PUBLIC_KEYS, VALIDATOR_WALLETS
+from empower1.blockchain.transaction import Transaction
+from empower1.blockchain.block import Block
+from empower1.network.node import Node # This path should be correct
+from empower1.network.messages import MessageType # This path should be correct
+from empower1.blockchain.wallet import Wallet
 
 class Network:
-    def __init__(self, blockchain: Blockchain, host: str, port: int, node_id: str = None, seed_nodes: set = None):
+    def __init__(self, blockchain: Blockchain, host: str, port: int, node_id: str = None, seed_nodes: set = None, node_wallet: Wallet = None):
         self.blockchain = blockchain
+        self.node_wallet_for_operations = node_wallet
+
         if hasattr(self.blockchain, 'set_network_interface'):
             self.blockchain.set_network_interface(self)
         elif hasattr(self.blockchain, 'network_interface'):
              self.blockchain.network_interface = self
-        self.self_node = Node(host=host, port=port, node_id=node_id)
-        # print(f"Network interface initialized for Node: {self.self_node.node_id} at {self.self_node.address}")
+
+        self.self_node = Node(host=host, port=port, node_id=node_id or (node_wallet.address if node_wallet else f"{host}:{port}"))
         self.peers = set()
         self.seen_tx_ids_broadcast = set()
         self.seen_block_hashes_broadcast = set()
@@ -30,409 +33,363 @@ class Network:
 
     def _configure_routes(self):
         @self.app.route('/ping', methods=['GET'])
-        def ping():
-            return jsonify({"message": "pong", "node_id": self.self_node.node_id, "address": self.self_node.address}), 200
-
+        def ping(): return jsonify({"message": "pong", "node_id": self.self_node.node_id, "address": self.self_node.address}), 200
         @self.app.route(f"/{str(MessageType.GET_CHAIN)}", methods=['GET'])
         def get_chain_endpoint():
-            try:
-                chain_data_dicts = [block.to_dict() for block in self.blockchain.chain]
-            except Exception as e:
-                # print(f"Error serializing chain for GET_CHAIN: {e}")
-                return jsonify({"error": "Failed to serialize chain data", "details": str(e)}), 500
+            try: chain_data_dicts = [block.to_dict() for block in self.blockchain.chain]
+            except Exception as e: return jsonify({"error": "Failed to serialize chain data", "details": str(e)}), 500
             return jsonify({"chain": chain_data_dicts, "length": len(self.blockchain.chain)}), 200
-
         @self.app.route(f"/{str(MessageType.GET_PEERS)}", methods=['GET'])
-        def get_peers_api():
-            peer_addresses = [peer.address for peer in list(self.peers)]
-            return jsonify({"peers": peer_addresses, "node_id": self.self_node.node_id}), 200
-
+        def get_peers_api(): return jsonify({"peers": [p.address for p in list(self.peers)], "node_id": self.self_node.node_id}), 200
         @self.app.route(f"/{str(MessageType.NEW_PEER_ANNOUNCE)}", methods=['POST'])
         def new_peer_announce_api():
-            data = request.get_json()
-            if not data or 'address' not in data: return jsonify({"error": "Missing peer address"}), 400
-            peer_address = data['address']
-            if not isinstance(peer_address, str) or not peer_address.startswith("http://"): return jsonify({"error": "Invalid peer address format"}), 400
-            if peer_address == self.self_node.address: return jsonify({"message": "Cannot add self as peer"}), 400
+            data=request.get_json(); P="address"; E="error"; M="message"
+            if not data or P not in data: return jsonify({E:"Missing peer address"}),400
+            pa=data[P]
+            print(f"!!! DBG Node {self.self_node.port}: Received NEW_PEER_ANNOUNCE for {pa}", flush=True)
+            if not isinstance(pa,str) or not pa.startswith("http://"): return jsonify({E:"Invalid peer address format"}),400
+            if pa==self.self_node.address: return jsonify({M:"Cannot add self as peer"}),400
             try:
-                peer_node = Node.from_address_string(peer_address)
-                if self.add_peer(peer_node): return jsonify({"message": "Peer added", "peer": peer_node.to_dict()}), 201
-                else: return jsonify({"message": "Peer already known or is self"}), 200
-            except ValueError as e: return jsonify({"error": f"Invalid peer address: {str(e)}"}), 400
-            except Exception as e: return jsonify({"error": "Failed to process peer announcement"}), 500
-
+                pn=Node.from_address_string(pa)
+                # Changed: connect_to_peer will handle adding and further peer requests.
+                # This endpoint is just for being informed about a peer.
+                if self.connect_to_peer(pa): # Use pa (string) for connect_to_peer
+                    return jsonify({M:"Peer connection process initiated", "peer_address":pa}), 202 # Accepted for processing
+                else:
+                    return jsonify({M:"Peer is self or connection failed"}), 400
+            except ValueError as e: return jsonify({E:f"Invalid peer address: {str(e)}"}),400
+            except Exception as e: return jsonify({E:f"Failed to process peer: {str(e)}"}),500
         @self.app.route(f"/{str(MessageType.NEW_TRANSACTION)}", methods=['POST'])
         def new_transaction_api():
-            tx_data = request.get_json()
-            if not tx_data: return jsonify({"error": "No data provided"}), 400
-            success = self.handle_received_transaction(tx_data)
-            if success: return jsonify({"message": "Transaction processed"}), 200
-            else: return jsonify({"message": "Failed to process transaction"}), 400
-
+            d=request.get_json(); E="error"; M="message"
+            if not d: return jsonify({E:"No data"}),400
+            if self.handle_received_transaction(d): return jsonify({M:"Tx processed"}),200
+            else: return jsonify({M:"Failed to process tx"}),400
         @self.app.route(f"/{str(MessageType.NEW_BLOCK)}", methods=['POST'])
         def new_block_api():
-            block_data = request.get_json()
-            if not block_data: return jsonify({"error": "No data provided"}), 400
-            success = self.handle_received_block(block_data)
-            if success: return jsonify({"message": "Block processed"}), 200
-            else: return jsonify({"message": "Failed to process block"}), 400
+            d=request.get_json(); E="error"; M="message"
+            if not d: return jsonify({E:"No data"}),400
+            if self.handle_received_block(d): return jsonify({M:"Block processed"}),200
+            else: return jsonify({M:"Failed to process block"}),400
+        @self.app.route('/debug_stake_self', methods=['POST'])
+        def debug_stake_self():
+            if not self.node_wallet_for_operations:return jsonify({"error":"Node wallet not configured"}),500
+            d=request.get_json(); E="error"; M="message"
+            if not d or'amount'not in d:return jsonify({E:"Missing amount"}),400
+            try:
+                sa=float(d['amount']);
+                if sa<=0:return jsonify({E:"Stake must be positive"}),400
+                self.blockchain.register_validator_wallet(self.node_wallet_for_operations,sa)
+                VALIDATOR_WALLETS[self.node_wallet_for_operations.address]=self.node_wallet_for_operations
+                return jsonify({M:f"Node {self.self_node.node_id} staked {sa}"}),200
+            except ValueError:return jsonify({E:"Invalid stake amount"}),400
+            except Exception as e:return jsonify({E:f"Staking failed: {str(e)}"}),500
+        @self.app.route('/debug_create_tx', methods=['POST'])
+        def debug_create_tx():
+            if not self.node_wallet_for_operations:return jsonify({"error":"Node wallet not configured"}),500
+            d=request.get_json();E="error";M="message"
+            if not d or'receiver_address'not in d or'amount'not in d:return jsonify({E:"Missing receiver or amount"}),400
+            try:
+                r=d['receiver_address'];amt=float(d['amount']);aid=d.get('asset_id',Blockchain.NATIVE_CURRENCY_SYMBOL)
+                if amt<=0:return jsonify({E:"Amount must be positive"}),400
+                tx=Transaction(self.node_wallet_for_operations.address,r,amt,aid)
+                tx.sign(self.node_wallet_for_operations)
+                if self.blockchain.add_transaction(tx,self.node_wallet_for_operations.get_public_key_hex()):
+                    return jsonify({M:"Tx created and added", "tx_id":tx.transaction_id}),201
+                else:return jsonify({M:"Failed to add tx (check node logs)"}),400
+            except ValueError:return jsonify({E:"Invalid amount"}),400
+            except Exception as e:return jsonify({E:f"Tx creation failed: {str(e)}"}),500
+        @self.app.route('/debug_faucet', methods=['POST'])
+        def debug_faucet_endpoint():
+            d=request.get_json();E="error";M="message"
+            if not d or'address'not in d or'amount'not in d:return jsonify({E:"Missing address/amount"}),400
+            try:
+                ta=d['address'];amt=float(d['amount'])
+                if amt<=0:return jsonify({E:"Amount must be positive"}),400
+                self.blockchain.balances[ta]=self.blockchain.balances.get(ta,0.0)+amt
+                self.blockchain.total_supply_epc+=amt
+                return jsonify({M:"Faucet funds added", "address":ta,"new_balance":self.blockchain.balances[ta]}),200
+            except ValueError:return jsonify({E:"Invalid amount for faucet"}),400
+            except Exception as e:return jsonify({E:f"Faucet failed: {str(e)}"}),500
+        @self.app.route('/mine_block_debug', methods=['POST'])
+        def mine_block_debug_endpoint():
+            mb=self.blockchain.mine_pending_transactions()
+            if mb:return jsonify({"message":"Block mined","block_hash":mb.hash,"index":mb.index}),200
+            else:return jsonify({"message":"Mining failed/no txs (check logs)"}),500
+        @self.app.route('/debug_get_user_public_keys', methods=['GET'])
+        def debug_get_user_public_keys_endpoint(): return jsonify(USER_PUBLIC_KEYS),200
+        @self.app.route('/debug_add_user_public_key', methods=['POST'])
+        def debug_add_user_public_key_endpoint():
+            d=request.get_json();E="error";M="message"
+            if not d or'address'not in d or'public_key_hex'not in d:return jsonify({E:"Missing address/pk_hex"}),400
+            print(f"!!! DBG Node {self.self_node.port}: Received /debug_add_user_public_key for {d['address']}", flush=True)
+            USER_PUBLIC_KEYS[d['address']]=d['public_key_hex']
+            print(f"!!! DBG Node {self.self_node.port}: USER_PUBLIC_KEYS dict ID: {id(USER_PUBLIC_KEYS)}, Now contains: {list(USER_PUBLIC_KEYS.keys())}", flush=True)
+            return jsonify({M:f"PK for {d['address']} added/updated."}),200
+        @self.app.route('/debug_connect_to_peer', methods=['POST'])
+        def debug_connect_to_peer_endpoint():
+            data = request.get_json()
+            if not data or 'address' not in data: return jsonify({"error": "Missing peer address to connect to"}), 400
+            peer_addr_to_connect = data['address']
+            if self.connect_to_peer(peer_addr_to_connect): return jsonify({"message": f"Conn attempt to {peer_addr_to_connect} success"}), 200
+            else: return jsonify({"message": f"Conn attempt to {peer_addr_to_connect} failed"}), 400
 
     def start_server(self, threaded=True):
         if threaded:
-            server_thread = threading.Thread(target=lambda: self.app.run(host=self.self_node.host, port=self.self_node.port, debug=False, use_reloader=False))
-            server_thread.daemon = True
-            server_thread.start()
-        else: self.app.run(host=self.self_node.host, port=self.self_node.port, debug=True)
-        print(f"[{self.self_node.node_id}] HTTP server started on {self.self_node.address}.")
+            st=threading.Thread(target=lambda:self.app.run(host=self.self_node.host,port=self.self_node.port,debug=False,use_reloader=False))
+            st.daemon=True;st.start()
+        else:self.app.run(host=self.self_node.host,port=self.self_node.port,debug=True)
 
-    def _send_http_request(self, method: str, peer_address: str, endpoint_path: str, json_data: dict = None, timeout=5) -> dict | None:
+    def _send_http_request(self, method:str,pa:str,ep:str,jd:dict=None,t=5) -> dict|None:
         try:
-            url = f"{peer_address}{endpoint_path}"
-            if method.upper() == 'GET': response = requests.get(url, timeout=timeout)
-            elif method.upper() == 'POST': response = requests.post(url, json=json_data, timeout=timeout)
-            else: return None
-            response.raise_for_status()
-            return response.json()
-        except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError, requests.exceptions.Timeout, requests.exceptions.RequestException): pass
-        return None
+            u=f"{pa}{ep}";r=requests.request(method.upper(),u,json=jd,timeout=t) if method.upper()=='POST' else requests.get(u,timeout=t)
+            r.raise_for_status();return r.json()
+        except requests.exceptions.RequestException as e:print(f"DBG Net Req Fail: {method} {pa}{ep} -> {e}", flush=True);return None
 
-    def connect_to_peer(self, peer_address: str) -> bool:
-        if peer_address == self.self_node.address: return False
-        ping_response = self._send_http_request('GET', peer_address, '/ping')
-        if ping_response and ping_response.get("address") == peer_address:
+    def _announce_self_to_peer(self, pn:Node):
+        # print(f"!!! DBG Node {self.self_node.port}: Announcing self to {pn.address}", flush=True)
+        self._send_http_request('POST',pn.address,f"/{str(MessageType.NEW_PEER_ANNOUNCE)}",jd={"address":self.self_node.address})
+
+    def connect_to_peer(self, pa:str) -> bool:
+        print(f"!!! DBG Node {self.self_node.port}: connect_to_peer called for {pa}", flush=True)
+        if pa==self.self_node.address:return False
+        pr=self._send_http_request('GET',pa,'/ping')
+        if pr and pr.get("address")==pa:
             try:
-                peer_node = Node.from_address_string(peer_address)
-                added = self.add_peer(peer_node)
-                if added or peer_node in self.peers:
-                    if len(self.blockchain.chain) == 1 and not self.syncing_in_progress:
-                         self.request_chain_from_peer(peer_node)
-                return added
-            except ValueError: pass
+                pn=Node.from_address_string(pa);wn=self.add_peer(pn) # add_peer also calls request_chain_from_peer if needed
+                if wn:self._announce_self_to_peer(pn)
+                return True
+            except ValueError:pass
         return False
 
-    def connect_to_seed_nodes(self):
-        for seed_address in list(self.seed_nodes): self.connect_to_peer(seed_address)
+    def connect_to_seed_nodes(self): [self.connect_to_peer(sa) for sa in list(self.seed_nodes)]
 
-    def add_peer(self, peer_node: Node) -> bool:
-        if peer_node.address == self.self_node.address or peer_node in self.peers: return False
-        self.peers.add(peer_node)
-        print(f"[{self.self_node.node_id}] Added peer: {peer_node.address}. Total: {len(self.peers)}")
-        self.request_peers_from(peer_node)
+    def add_peer(self, pn:Node) -> bool:
+        print(f"!!! DBG Node {self.self_node.port}: Attempting to add peer {pn.address}", flush=True)
+        if pn.address==self.self_node.address or pn in self.peers:
+            print(f"!!! DBG Node {self.self_node.port}: Peer {pn.address} is self or already known.", flush=True)
+            return False
+        self.peers.add(pn)
+        print(f"!!! DBG Node {self.self_node.port}: Added peer {pn.address}. Total: {len(self.peers)}. Requesting their peers.", flush=True)
+        self.request_peers_from(pn)
+
+        print(f"!!! DBG Node {self.self_node.port}: Checking sync condition after adding {pn.address}. My chain len: {len(self.blockchain.chain)}, Sync in progress: {self.syncing_in_progress}", flush=True)
+        if len(self.blockchain.chain) <= 1 and not self.syncing_in_progress:
+            print(f"!!! DBG Node {self.self_node.port}: Chain short after adding peer {pn.address}, calling request_chain_from_peer.", flush=True)
+            self.request_chain_from_peer(pn)
         return True
 
-    def request_peers_from(self, peer_node: Node):
-        response_data = self._send_http_request('GET', peer_node.address, f"/{str(MessageType.GET_PEERS)}")
-        if response_data and 'peers' in response_data:
-            for new_peer_addr_str in response_data['peers']:
-                if new_peer_addr_str != self.self_node.address and not any(p.address == new_peer_addr_str for p in self.peers):
-                    self.connect_to_peer(new_peer_addr_str)
+    def request_peers_from(self, pn:Node):
+        # print(f"!!! DBG Node {self.self_node.port}: Requesting peers from {pn.address}", flush=True)
+        rd=self._send_http_request('GET',pn.address,f"/{str(MessageType.GET_PEERS)}")
+        if rd and 'peers'in rd:
+            # print(f"!!! DBG Node {self.self_node.port}: Received peers from {pn.address}: {rd['peers']}", flush=True)
+            for npa in rd['peers']:
+                if npa!=self.self_node.address and not any(p.address==npa for p in self.peers):
+                    # print(f"!!! DBG Node {self.self_node.port}: Attempting to connect to newly discovered peer {npa} from {pn.address}", flush=True)
+                    self.connect_to_peer(npa) # This will ping, add, announce self, and request_peers_from again
 
-    def get_known_peers_addresses(self) -> list[str]: return [p.address for p in list(self.peers)]
+    def get_known_peers_addresses(self)->list[str]:return [p.address for p in list(self.peers)]
+    def broadcast_transaction(self,t:Transaction):
+        if t.transaction_id in self.seen_tx_ids_broadcast:return
+        td=t.to_dict();self.seen_tx_ids_broadcast.add(t.transaction_id)
+        for pn in list(self.peers):self._send_http_request('POST',pn.address,f"/{str(MessageType.NEW_TRANSACTION)}",jd=td)
+    def broadcast_block(self,b:Block):
+        if b.hash in self.seen_block_hashes_broadcast:return
+        bd=b.to_dict();self.seen_block_hashes_broadcast.add(b.hash)
+        for pn in list(self.peers):self._send_http_request('POST',pn.address,f"/{str(MessageType.NEW_BLOCK)}",jd=bd)
 
-    def broadcast_transaction(self, transaction: Transaction):
-        if transaction.transaction_id in self.seen_tx_ids_broadcast: return
-        tx_data = transaction.to_dict()
-        self.seen_tx_ids_broadcast.add(transaction.transaction_id)
-        for peer_node in list(self.peers):
-            self._send_http_request('POST', peer_node.address, f"/{str(MessageType.NEW_TRANSACTION)}", json_data=tx_data)
-
-    def broadcast_block(self, block: Block):
-        if block.hash in self.seen_block_hashes_broadcast: return
-        block_data = block.to_dict()
-        self.seen_block_hashes_broadcast.add(block.hash)
-        for peer_node in list(self.peers):
-            self._send_http_request('POST', peer_node.address, f"/{str(MessageType.NEW_BLOCK)}", json_data=block_data)
-
-    def handle_received_transaction(self, tx_data: dict) -> bool:
+    def handle_received_transaction(self,td:dict)->bool:
         try:
-            required_fields = ['sender_address', 'receiver_address', 'amount', 'signature_hex', 'transaction_id']
-            if not all(field in tx_data for field in required_fields): return False
-            transaction_id = tx_data['transaction_id']
-            if any(tx.transaction_id == transaction_id for tx in self.blockchain.pending_transactions) or \
-               any(any(tx.transaction_id == transaction_id for tx in b.transactions) for b in self.blockchain.chain):
-                return True
-            transaction = Transaction.from_dict(tx_data)
-            if transaction.transaction_id != transaction_id: return False
-            sender_public_key_hex = USER_PUBLIC_KEYS.get(transaction.sender_address)
-            if not sender_public_key_hex: return False
+            req=['sender_address','receiver_address','amount','signature_hex','transaction_id']
+            if not all(f in td for f in req):return False
+            tid=td['transaction_id']
+            if any(t.transaction_id==tid for t in self.blockchain.pending_transactions)or \
+               any(any(t.transaction_id==tid for t in b.transactions)for b in self.blockchain.chain):return True
+            trx=Transaction.from_dict(td)
+            if trx.transaction_id!=tid:return False
+            spk=USER_PUBLIC_KEYS.get(trx.sender_address)
+            if not spk:print(f"DBG HRT: PK not found for {trx.sender_address} in USER_PUBLIC_KEYS: {list(USER_PUBLIC_KEYS.keys())}", flush=True);return False
+            orig_ni=self.blockchain.network_interface;self.blockchain.network_interface=None
+            s=self.blockchain.add_transaction(trx,spk,received_from_network=True)
+            self.blockchain.network_interface=orig_ni
+            if s and trx.transaction_id not in self.seen_tx_ids_broadcast:self.broadcast_transaction(trx)
+            return s
+        except Exception as e:print(f"DBG HRT Exc: {e}", flush=True);return False
 
-            original_bc_net_interface = self.blockchain.network_interface
-            self.blockchain.network_interface = None
-            success = self.blockchain.add_transaction(transaction, sender_public_key_hex, received_from_network=True)
-            self.blockchain.network_interface = original_bc_net_interface
-            if success:
-                if transaction.transaction_id not in self.seen_tx_ids_broadcast:
-                     self.broadcast_transaction(transaction)
+    def handle_received_block(self,bd:dict)->bool:
+        try:
+            rb=Block.from_dict(bd)
+            if any(b.hash==rb.hash for b in self.blockchain.chain):return True
+            cl=len(self.blockchain.chain);lb=self.blockchain.last_block
+            is_direct_extension=(rb.index==cl and (lb and rb.previous_hash==lb.hash or cl==0 and rb.previous_hash=="0" and rb.index==0))
+            vpk=USER_PUBLIC_KEYS.get(rb.validator_address)
+            if not vpk:print(f"DBG HRB: Val PK {rb.validator_address} not found. Known: {list(USER_PUBLIC_KEYS.keys())}", flush=True);return False
+            # Block hash is calculated on instantiation. Here we verify if the received hash matches a recalculation.
+            if rb.hash!=rb.calculate_hash()or not rb.verify_block_signature(vpk):print(f"DBG HRB: Block sig/hash fail for block {rb.index} from {rb.validator_address}. Stored: {rb.hash}, Recalc: {rb.calculate_hash()}", flush=True);return False
+            for tx in rb.transactions:
+                tspk=USER_PUBLIC_KEYS.get(tx.sender_address)
+                if not tspk:print(f"DBG HRB: Tx Sender PK {tx.sender_address} not found. Known: {list(USER_PUBLIC_KEYS.keys())}", flush=True); return False
+                if not tx.verify_signature(tspk):print(f"DBG HRB: Tx sig fail {tx.transaction_id}", flush=True);return False
+            if is_direct_extension:
+                tb=self.blockchain.balances.copy();vbt=True
+                for tx in rb.transactions:
+                    if tx.asset_id==Blockchain.NATIVE_CURRENCY_SYMBOL:
+                        sb=tb.get(tx.sender_address,0.0)
+                        if sb<tx.amount:vbt=False;break
+                        tb[tx.sender_address]=sb-tx.amount;tb[tx.receiver_address]=tb.get(tx.receiver_address,0.0)+tx.amount
+                if not vbt:print(f"DBG HRB: Balance fail on temp check for block {rb.index}", flush=True);return False
+                orig_ni=self.blockchain.network_interface;self.blockchain.network_interface=None
+                for tx in rb.transactions:
+                    if not self.blockchain._process_transaction_for_state_changes(tx):
+                        print(f"DBG HRB: _process_tx_for_state_changes failed for tx {tx.transaction_id} in block {rb.index}", flush=True);
+                        self.blockchain.network_interface=orig_ni; return False
+                self.blockchain.chain.append(rb);self.blockchain.network_interface=orig_ni
+                self.blockchain.pending_transactions=[ptx for ptx in self.blockchain.pending_transactions if ptx.transaction_id not in {t.transaction_id for t in rb.transactions}]
+                if rb.hash not in self.seen_block_hashes_broadcast:self.broadcast_block(rb)
                 return True
+            elif rb.index>=cl and not self.syncing_in_progress and self.peers:
+                print(f"DBG HRB: Received block {rb.index} from {rb.validator_address} indicates fork or this node is behind. Requesting chain from a peer.", flush=True)
+                self.request_chain_from_peer(list(self.peers)[0]);return False
             return False
-        except Exception: return False
+        except Exception as e:print(f"ERR handle_recv_block: {e}", flush=True);return False
 
-    def handle_received_block(self, block_data: dict) -> bool:
-        try:
-            received_block = Block.from_dict(block_data)
-            if any(b.hash == received_block.hash for b in self.blockchain.chain): return True # Known
+    def request_chain_from_peer(self,pn:Node):
+        print(f"!!! DBG Node {self.self_node.port}: ENTERING request_chain_from_peer for peer {pn.address}", flush=True)
+        if self.syncing_in_progress: print(f"!!! DBG Node {self.self_node.port}: Sync already in progress, skipping for {pn.address}.", flush=True); return
+        self.syncing_in_progress=True
+        rd=self._send_http_request('GET',pn.address,f"/{str(MessageType.GET_CHAIN)}")
+        if rd and'chain'in rd and'length'in rd:
+            self.handle_chain_response(rd['chain'],pn)
+        else: print(f"!!! DBG Node {self.self_node.port}: Failed to get chain from {pn.address} or invalid response: {rd}", flush=True)
+        self.syncing_in_progress=False
 
-            current_chain_length = len(self.blockchain.chain)
-            last_block = self.blockchain.last_block # Can be None if chain is empty (not possible with current genesis)
+    def handle_chain_response(self,rcd:list[dict],fpn:Node):
+        print(f"!!! DBG HCR Node {self.self_node.port}: ENTERING handle_chain_response from peer {fpn.address}. Chain length received: {len(rcd) if rcd else 'None'}", flush=True)
+        print(f"!!! DBG HCR Node {self.self_node.port}: My current chain length: {len(self.blockchain.chain)}. My USER_PUBLIC_KEYS dict ID: {id(USER_PUBLIC_KEYS)}, Known keys for: {list(USER_PUBLIC_KEYS.keys())}", flush=True)
+        if not rcd: print(f"!!! DBG HCR Node {self.self_node.port}: Received empty chain data from {fpn.address}.", flush=True); return
 
-            # Validate block structure and signatures first
-            validator_pub_key = USER_PUBLIC_KEYS.get(received_block.validator_address)
-            if not validator_pub_key:
-                print(f"[{self.self_node.node_id}] Validator PK for {received_block.validator_address} not found for received block {received_block.hash}")
-                return False
-            if received_block.hash != received_block._calculate_block_hash():
-                print(f"[{self.self_node.node_id}] Invalid block hash for received block {received_block.hash}")
-                return False
-            if not received_block.verify_block_signature(validator_pub_key):
-                print(f"[{self.self_node.node_id}] Invalid block signature for received block {received_block.hash}")
-                return False
-            for tx in received_block.transactions:
-                tx_sender_pub_key = USER_PUBLIC_KEYS.get(tx.sender_address)
-                if not tx_sender_pub_key or not tx.verify_signature(tx_sender_pub_key):
-                    print(f"[{self.self_node.node_id}] Invalid tx {tx.transaction_id} in received block {received_block.hash}")
-                    return False
+        is_our_chain_just_genesis = len(self.blockchain.chain) == 1
 
-            # Check if it extends the current chain
-            if received_block.index == current_chain_length and \
-               (last_block and received_block.previous_hash == last_block.hash or current_chain_length == 0 and received_block.previous_hash == "0"): # Handles empty local chain for genesis
-
-                # Validate transactions for state changes against a temporary balance state
-                # This ensures the block is valid in terms of fund transfers before committing it
-                temp_balances = self.blockchain.balances.copy()
-                valid_block_transactions = True
-                for tx in received_block.transactions:
-                    if tx.asset_id == Blockchain.NATIVE_CURRENCY_SYMBOL:
-                        sender_bal = temp_balances.get(tx.sender_address, 0.0)
-                        if sender_bal < tx.amount:
-                            print(f"[{self.self_node.node_id}] Tx {tx.transaction_id} in received block {received_block.hash} invalidates state (insufficient funds).")
-                            valid_block_transactions = False
-                            break
-                        temp_balances[tx.sender_address] = sender_bal - tx.amount
-                        temp_balances[tx.receiver_address] = temp_balances.get(tx.receiver_address, 0.0) + tx.amount
-
-                if not valid_block_transactions:
-                    return False # Block contains transactions that would make state invalid
-
-                # If all good, apply to actual state and add to chain
-                original_bc_net_interface = self.blockchain.network_interface
-                self.blockchain.network_interface = None # Prevent broadcast from internal add_block
-
-                for tx in received_block.transactions: # Apply to actual balances
-                    self.blockchain._process_transaction_for_state_changes(tx)
-                self.blockchain.chain.append(received_block)
-
-                self.blockchain.network_interface = original_bc_net_interface # Restore
-
-                mined_tx_ids = {tx.transaction_id for tx in received_block.transactions}
-                self.blockchain.pending_transactions = [
-                    p_tx for p_tx in self.blockchain.pending_transactions if p_tx.transaction_id not in mined_tx_ids
-                ]
-                print(f"[{self.self_node.node_id}] Added block {received_block.hash} (Index: {received_block.index}) from network.")
-                if received_block.hash not in self.seen_block_hashes_broadcast:
-                    self.broadcast_block(received_block)
-                return True
-
-            # Potential fork or this node is behind
-            elif received_block.index >= current_chain_length and not self.syncing_in_progress :
-                print(f"[{self.self_node.node_id}] Received block {received_block.hash} (Idx: {received_block.index}) indicates possible fork or being behind. Requesting chain.")
-                # Simplistic: sync from first available peer if any.
-                # In a real scenario, might sync from the peer that sent this block if that info is available.
-                if self.peers: self.request_chain_from_peer(list(self.peers)[0])
-                return False
-            else:
-                return False # Older or irrelevant block
-        except Exception as e:
-            print(f"[{self.self_node.node_id}] Error processing received block: {e}")
-        return False
-
-    def request_chain_from_peer(self, peer_node: Node):
-        if self.syncing_in_progress: return
-        self.syncing_in_progress = True
-        # print(f"[{self.self_node.node_id}] Requesting full chain from peer {peer_node.address}...")
-        response_data = self._send_http_request('GET', peer_node.address, f"/{str(MessageType.GET_CHAIN)}")
-        if response_data and 'chain' in response_data and 'length' in response_data:
-            # print(f"[{self.self_node.node_id}] Received chain of length {response_data['length']} from {peer_node.address}.")
-            self.handle_chain_response(response_data['chain'], peer_node)
-        # else: print(f"[{self.self_node.node_id}] Failed to get chain from {peer_node.address} or invalid response.")
-        self.syncing_in_progress = False
-
-    def handle_chain_response(self, received_chain_dicts: list[dict], from_peer_node: Node):
-        # print(f"[{self.self_node.node_id}] Processing chain response from {from_peer_node.address} with {len(received_chain_dicts)} blocks.")
-        if not received_chain_dicts: return
-        if len(received_chain_dicts) <= len(self.blockchain.chain): return
-
-        prospective_chain = []
-        try:
-            for block_data in received_chain_dicts: prospective_chain.append(Block.from_dict(block_data))
-        except Exception as e:
-            print(f"[{self.self_node.node_id}] Error deserializing received chain from {from_peer_node.address}: {e}")
+        if not is_our_chain_just_genesis and len(rcd) <= len(self.blockchain.chain):
+            print(f"!!! DBG HCR Node {self.self_node.port}: Received chain not longer or not new node. Ours:{len(self.blockchain.chain)} Theirs:{len(rcd)}", flush=True)
             return
 
-        # Validate the prospective_chain (simplified full validation)
-        # This requires creating a temporary Blockchain or having a static validation utility.
-        # For now, adapt Blockchain.is_chain_valid logic:
-        temp_bc = Blockchain(network_interface=None) # Create a temporary, clean blockchain for validation
-        temp_bc.chain = [] # Start with an empty chain for this temp instance.
-        temp_bc.balances = {} # Reset balances for temp validation
+        pc=[];
+        try:
+            for bd in rcd:pc.append(Block.from_dict(bd))
+        except Exception as e:print(f"ERR deserializing rcvd chain: {e}", flush=True);return
+        if not pc:print(f"!!! DBG HCR Node {self.self_node.port}: Prospective chain empty after deserialization.", flush=True);return
 
-        # Manually set genesis of temp_bc to match the received chain's genesis for validation to pass
-        # This assumes received_chain_dicts[0] is the genesis.
-        # And that its validator's pubkey is in USER_PUBLIC_KEYS (might need to ensure this for test/real scenarios)
-        if prospective_chain:
-            # Critical: Ensure the genesis validator's details for the prospective chain are known
-            # For simplicity, if our current chain is just genesis, we accept theirs if it's longer and valid from its own genesis.
-            # If we have a longer chain, their genesis MUST match ours.
-            if len(self.blockchain.chain) > 1 and prospective_chain[0].hash != self.blockchain.chain[0].hash :
-                print(f"[{self.self_node.node_id}] Received chain from {from_peer_node.address} has different genesis. Sync failed.")
-                return
+        valid_pc=True
+        # If our chain is established (more than 1 block), prospective chain's genesis MUST match ours.
+        if not is_our_chain_just_genesis and pc[0].hash!=self.blockchain.chain[0].hash:
+            print(f"!!! DBG HCR Node {self.self_node.port}: Genesis mismatch. Ours:{self.blockchain.chain[0].hash[:7]} Theirs:{pc[0].hash[:7]}. Local chain > 1 block. Rejecting.", flush=True)
+            valid_pc=False
 
-            # If our chain is only genesis, we trust the peer's genesis for now if it's valid itself.
-            # We need to populate USER_PUBLIC_KEYS for validators in prospective_chain if not already known.
-            # This is a simulation limitation. For this test, assume they are known or validation will fail.
-            temp_bc.chain.append(prospective_chain[0]) # Add peer's genesis to temp_bc
-            # Initialize balances for temp_bc based on its genesis (if it has initial allocation logic)
-            # This part is tricky without knowing how prospective_chain[0] allocated initial supply
-            # For now, let's assume _create_and_sign_genesis_block in the temp_bc will handle it if we re-init.
-            # Or, more simply for validation, just ensure the received genesis is valid on its own.
-            genesis_val_pk = USER_PUBLIC_KEYS.get(prospective_chain[0].validator_address)
-            if not genesis_val_pk or not prospective_chain[0].verify_block_signature(genesis_val_pk):
-                print(f"[{self.self_node.node_id}] Received chain's genesis block from {from_peer_node.address} is invalid. Sync failed.")
-                return
-            # Simulate initial balance for the temp validation
-            temp_bc.balances[prospective_chain[0].validator_address] = self.blockchain.total_supply_epc # Assuming total supply is fixed from one genesis type
+        temp_bals={};
+        if valid_pc:
+            pgv_addr = pc[0].validator_address
+            temp_bals[pgv_addr] = self.blockchain.total_supply_epc
+            if is_our_chain_just_genesis and pc[0].hash != self.blockchain.chain[0].hash:
+                print(f"!!! DBG HCR Node {self.self_node.port}: New node adopting new genesis {pc[0].hash[:7]} from validator {pgv_addr}.", flush=True)
 
-            # Validate rest of the prospective chain using temp_bc's context
-            valid_so_far = True
-            for i in range(1, len(prospective_chain)):
-                block_to_validate = prospective_chain[i]
-                # Simulate adding to temp_bc to validate against its current state (last block, balances)
-                temp_bc.pending_transactions = list(block_to_validate.transactions) # Load txs for this block
+        if valid_pc:
+            temp_validated_pc = []
+            for i in range(len(pc)):
+                cb=pc[i]
+                print(f"!!! DBG HCR Node {self.self_node.port}: Validating prospective block {i}, Val: {cb.validator_address}, Hash: {cb.hash[:7]}", flush=True)
+                # cb.hash is what was received. cb.calculate_hash() is based on its current (deserialized) content.
+                if cb.hash!=cb.calculate_hash():print(f"!!! DBG HCR Node {self.node.port}: Hash mismatch B{i}. Stored: {cb.hash}, Recalc: {cb.calculate_hash()}", flush=True);valid_pc=False;break
+                vpk=USER_PUBLIC_KEYS.get(cb.validator_address)
+                if i==0:
+                    if cb.index!=0 or cb.previous_hash!="0":print(f"!!! DBG HCR Node {self.self_node.port}: Invalid G B{i} idx/prevH", flush=True);valid_pc=False;break
+                    if not vpk: print(f"!!! DBG HCR Node {self.self_node.port}: Missing PK for G validator {cb.validator_address}. My Keys: {list(USER_PUBLIC_KEYS.keys())}", flush=True);valid_pc=False;break
+                    if not cb.verify_block_signature(vpk):print(f"!!! DBG HCR Node {self.self_node.port}: Invalid G B{i} sig for {cb.validator_address}", flush=True);valid_pc=False;break
+                else:
+                    pb=temp_validated_pc[i-1]
+                    if cb.previous_hash!=pb.hash or cb.index!=len(temp_validated_pc):print(f"!!! DBG HCR Node {self.self_node.port}: Link/Idx mismatch B{i}", flush=True);valid_pc=False;break
+                    if not vpk: print(f"!!! DBG HCR Node {self.self_node.port}: Missing PK for B{i} validator {cb.validator_address}. My Keys: {list(USER_PUBLIC_KEYS.keys())}", flush=True); valid_pc=False; break
+                    if not cb.verify_block_signature(vpk):print(f"!!! DBG HCR Node {self.self_node.port}: Invalid B{i} sig for {cb.validator_address}", flush=True);valid_pc=False;break
+                for tx_idx, tx in enumerate(cb.transactions):
+                    # print(f"!!! DBG HCR Node {self.self_node.port}: Validating B{i}/Tx{tx_idx}, Sender: {tx.sender_address}", flush=True)
+                    tspk=USER_PUBLIC_KEYS.get(tx.sender_address)
+                    if not tspk: print(f"!!! DBG HCR Node {self.self_node.port}: Missing PK for Tx sender {tx.sender_address} in B{i}. My Keys: {list(USER_PUBLIC_KEYS.keys())}", flush=True); valid_pc=False; break
+                    if not tx.verify_signature(tspk):print(f"!!! DBG HCR Node {self.self_node.port}: Invalid Tx {tx.transaction_id[:7]} in B{i}", flush=True);valid_pc=False;break
+                    if tx.asset_id==Blockchain.NATIVE_CURRENCY_SYMBOL:
+                        sb=temp_bals.get(tx.sender_address,0.0)
+                        if sb<tx.amount:print(f"!!! DBG HCR Node {self.self_node.port}: Insuff funds Tx {tx.transaction_id[:7]} in B{i} (Bal:{sb} Amt:{tx.amount})", flush=True);valid_pc=False;break
+                        temp_bals[tx.sender_address]=sb-tx.amount;temp_bals[tx.receiver_address]=temp_bals.get(tx.receiver_address,0.0)+tx.amount
+                if not valid_pc:break
+                temp_validated_pc.append(cb)
 
-                # Temporarily set network_interface to None to avoid broadcasts during validation
-                original_temp_net_interface = temp_bc.network_interface
-                temp_bc.network_interface = None
-
-                # We can't directly call mine_pending_transactions as it selects a validator.
-                # We need to validate the block as if it were received.
-                # This means checking its structure, then applying its transactions to temp_bc.balances
-
-                # Structural and signature checks (already done partially in handle_received_block)
-                # Re-check here in context of the prospective chain
-                prev_b = temp_bc.last_block
-                if block_to_validate.previous_hash != prev_b.hash or \
-                   block_to_validate.index != len(temp_bc.chain) or \
-                   block_to_validate.hash != block_to_validate._calculate_block_hash():
-                    valid_so_far = False; break
-
-                val_pk = USER_PUBLIC_KEYS.get(block_to_validate.validator_address)
-                if not val_pk or not block_to_validate.verify_block_signature(val_pk):
-                    valid_so_far = False; break
-
-                for tx in block_to_validate.transactions:
-                    tx_sender_pk = USER_PUBLIC_KEYS.get(tx.sender_address)
-                    if not tx_sender_pk or not tx.verify_signature(tx_sender_pk):
-                        valid_so_far = False; break
-                    # Simulate processing tx for state changes on temp_bc.balances
-                    if tx.asset_id == Blockchain.NATIVE_CURRENCY_SYMBOL:
-                        s_bal = temp_bc.balances.get(tx.sender_address, 0.0)
-                        if s_bal < tx.amount: valid_so_far = False; break
-                        temp_bc.balances[tx.sender_address] = s_bal - tx.amount
-                        temp_bc.balances[tx.receiver_address] = temp_bc.balances.get(tx.receiver_address, 0.0) + tx.amount
-                if not valid_so_far: break
-
-                temp_bc.chain.append(block_to_validate) # Add to temp chain to continue validation
-                temp_bc.pending_transactions = [] # Clear for next block
-                temp_bc.network_interface = original_temp_net_interface
-
-
-            if valid_so_far:
-                print(f"[{self.self_node.node_id}] Received chain from {from_peer_node.address} is valid and longer. Updating local chain.")
-                self.blockchain.chain = prospective_chain
-                self.blockchain.balances = temp_bc.balances # Adopt the replayed balances
-                self.blockchain.pending_transactions = []
-                self.seen_block_hashes_broadcast.clear()
-                self.seen_tx_ids_broadcast.clear()
-                for block in self.blockchain.chain:
-                    self.seen_block_hashes_broadcast.add(block.hash)
-                    for tx in block.transactions: self.seen_tx_ids_broadcast.add(tx.transaction_id)
-            else:
-                print(f"[{self.self_node.node_id}] Received chain from {from_peer_node.address} is invalid. Local chain preserved.")
-        # else: # Prospective chain was not valid from the start (e.g. bad genesis)
-            # print(f"[{self.self_node.node_id}] Initial validation of received chain from {from_peer_node.address} failed.")
-
+        if valid_pc and len(pc) > len(self.blockchain.chain):
+            print(f"[{self.self_node.node_id}] Received valid longer chain from {fpn.address} (len {len(pc)}). Updating local chain (len {len(self.blockchain.chain)}).", flush=True)
+            self.blockchain.chain=pc;self.blockchain.balances=temp_bals;self.blockchain.pending_transactions=[]
+            self.seen_block_hashes_broadcast.clear();self.seen_tx_ids_broadcast.clear()
+            for b_in_chain in self.blockchain.chain:
+                self.seen_block_hashes_broadcast.add(b_in_chain.hash)
+                for txb_in_chain in b_in_chain.transactions:self.seen_tx_ids_broadcast.add(txb_in_chain.transaction_id)
+        elif not valid_pc: print(f"[{self.self_node.node_id}] Received chain from {fpn.address} was invalid during HCR validation.", flush=True)
 
 if __name__ == '__main__':
     class DemoBlockchain:
         def __init__(self):
-            genesis_validator = Wallet()
-            USER_PUBLIC_KEYS[genesis_validator.address] = genesis_validator.get_public_key_hex()
-            VALIDATOR_WALLETS[genesis_validator.address] = genesis_validator
-
-            self.chain = []
-            self.balances = {} # Init balances
-            self.total_supply_epc = 1_000_000.0 # Define total supply for genesis
-
-            genesis_block = Block(0, [], time.time(), "0", genesis_validator.address)
-            genesis_block.sign_block(genesis_validator)
-            self.chain.append(genesis_block)
-            self.balances[genesis_validator.address] = self.total_supply_epc # Allocate in demo
-
-            self.pending_transactions = []
-            self.network_interface = None
-            # print("DemoBlockchain initialized for Network demo.")
-
-        def add_transaction(self, transaction, sender_public_key_hex, received_from_network=False):
-            if transaction.verify_signature(sender_public_key_hex):
-                if not any(tx.transaction_id == transaction.transaction_id for tx in self.pending_transactions):
-                    self.pending_transactions.append(transaction)
-                if self.network_interface and not received_from_network:
-                    self.network_interface.broadcast_transaction(transaction)
+            self.NATIVE_CURRENCY_SYMBOL = "EPC";self.total_supply_epc = 1_000_000.0
+            gv=Wallet();USER_PUBLIC_KEYS[gv.address]=gv.get_public_key_hex();VALIDATOR_WALLETS[gv.address]=gv
+            self.chain=[];self.balances={};gb=Block(0,[],time.time(),"0",gv.address)
+            if gb:gb.sign_block(gv);self.chain.append(gb);self.balances[gv.address]=self.total_supply_epc
+            self.pending_transactions=[];self.network_interface=None
+            self.validator_manager = ValidatorManager()
+        def add_transaction(self,t,spk,received_from_network=False):
+            if t.verify_signature(spk):
+                sbal=self.balances.get(t.sender_address,0.0)
+                pout=sum(ptx.amount for ptx in self.pending_transactions if ptx.sender_address==t.sender_address and ptx.asset_id==self.NATIVE_CURRENCY_SYMBOL)
+                if t.asset_id==self.NATIVE_CURRENCY_SYMBOL and sbal-pout<t.amount: return False
+                if not any(tx.transaction_id==t.transaction_id for tx in self.pending_transactions):self.pending_transactions.append(t)
+                if self.network_interface and not received_from_network:self.network_interface.broadcast_transaction(t)
                 return True
             return False
-
         @property
-        def last_block(self):
-            return self.chain[-1] if self.chain else None
-
-        # Minimal _process_transaction_for_state_changes for demo
-        def _process_transaction_for_state_changes(self, transaction: Transaction) -> bool:
-            if transaction.asset_id == Blockchain.NATIVE_CURRENCY_SYMBOL: # Use class attribute
-                sender_balance = self.balances.get(transaction.sender_address, 0.0)
-                if sender_balance < transaction.amount: return False
-                self.balances[transaction.sender_address] = sender_balance - transaction.amount
-                self.balances[transaction.receiver_address] = self.balances.get(transaction.receiver_address, 0.0) + transaction.amount
+        def last_block(self):return self.chain[-1] if self.chain else None
+        def _process_transaction_for_state_changes(self,t:Transaction)->bool:
+            if t.asset_id==self.NATIVE_CURRENCY_SYMBOL:
+                sb=self.balances.get(t.sender_address,0.0)
+                if sb<t.amount:return False
+                self.balances[t.sender_address]=sb-tx.amount;self.balances[t.receiver_address]=self.balances.get(t.receiver_address,0.0)+tx.amount
             return True
+        def mine_pending_transactions(self):
+            if not self.pending_transactions: return None
+            miner_wallet = self.network_interface.node_wallet_for_operations if self.network_interface and self.network_interface.node_wallet_for_operations else Wallet()
+            if miner_wallet.address not in VALIDATOR_WALLETS:
+                 VALIDATOR_WALLETS[miner_wallet.address]=miner_wallet;USER_PUBLIC_KEYS[miner_wallet.address]=miner_wallet.get_public_key_hex()
+            validator_obj = self.validator_manager.get_validator(miner_wallet.address)
+            if not validator_obj or not validator_obj.is_active:
+                selected_val_obj = self.validator_manager.select_next_validator()
+                if not selected_val_obj: return None
+                miner_wallet = VALIDATOR_WALLETS.get(selected_val_obj.address)
+                if not miner_wallet: return None
+            b=Block(len(self.chain),list(self.pending_transactions),time.time(),self.last_block.hash,miner_wallet.address)
+            b.sign_block(miner_wallet);[self._process_transaction_for_state_changes(tx)for tx in b.transactions];self.chain.append(b)
+            self.pending_transactions=[];
+            if self.network_interface:self.network_interface.broadcast_block(b)
+            return b
+        def register_validator_wallet(self, val_wallet: Wallet, stake: float):
+            self.validator_manager.add_or_update_validator_stake(val_wallet.address, val_wallet.get_public_key_hex(), stake)
 
-
-    demo_bc = DemoBlockchain()
-    import sys
-    default_host = "127.0.0.1"
-    default_port = 5000
-
-    if len(sys.argv) > 1 and sys.argv[1] == '--help':
-        print("Usage: python empower1/network/network.py [host] [port] [seed_node_http_address ...]")
-        sys.exit(0)
-
-    host = sys.argv[1] if len(sys.argv) > 1 else default_host
-    try: port = int(sys.argv[2]) if len(sys.argv) > 2 else default_port
-    except ValueError: port = default_port
-
-    seed_nodes_for_demo = set(sys.argv[3:]) if len(sys.argv) > 3 else set()
-    valid_seeds = {sn for sn in seed_nodes_for_demo if sn.startswith("http://") and ":" in sn.split("http://")[1]}
-
-    network_manager = Network(blockchain=demo_bc, host=host, port=port, seed_nodes=valid_seeds)
-    demo_bc.network_interface = network_manager
-
-    network_manager.start_server(threaded=True)
-
-    time.sleep(0.5)
-    if valid_seeds: network_manager.connect_to_seed_nodes()
-    elif len(demo_bc.chain) <=1 and not valid_seeds:
-        print(f"[{network_manager.self_node.node_id}] No seed nodes. Started with genesis block.")
-
-    print(f"\nNode {network_manager.self_node.node_id} running. API: {network_manager.self_node.address}")
-    print(f"Peers: {network_manager.get_known_peers_addresses()}")
-
+    demo_bc=DemoBlockchain();host=sys.argv[1]if len(sys.argv)>1 and not sys.argv[1].startswith("http")else "127.0.0.1"
+    pcidx=2 if(len(sys.argv)>1 and not sys.argv[1].startswith("http"))else 1
+    try:port=int(sys.argv[pcidx])if len(sys.argv)>pcidx and not sys.argv[pcidx].startswith("http")else 5000
+    except(ValueError,IndexError):port=5000
+    ssidx=pcidx+1 if(len(sys.argv)>pcidx and not sys.argv[pcidx].startswith("http"))else pcidx
+    s_nodes=set(sys.argv[ssidx:])if len(sys.argv)>ssidx else set()
+    v_seeds={sn for sn in s_nodes if sn.startswith("http://")and":"in sn.split("http://")[1]}
+    node_mw=Wallet();USER_PUBLIC_KEYS[node_mw.address]=node_mw.get_public_key_hex()
+    nm=Network(blockchain=demo_bc,host=host,port=port,seed_nodes=v_seeds,node_wallet=node_mw)
+    demo_bc.network_interface=nm;nm.start_server(threaded=True);time.sleep(0.5)
+    if v_seeds:nm.connect_to_seed_nodes()
+    elif len(demo_bc.chain)<=1 and not v_seeds and sys.stdin.isatty():print(f"[{nm.self_node.node_id}] No seeds. Started with genesis.")
+    if sys.stdin.isatty():print(f"\nNode {nm.self_node.node_id} running. API: {nm.self_node.address}\nPeers: {nm.get_known_peers_addresses()}")
     try:
-        while True: time.sleep(15)
-    except KeyboardInterrupt: print(f"\nNode {network_manager.self_node.node_id} shutting down.")
+        while True:time.sleep(15)
+    except KeyboardInterrupt:print(f"\nNode {nm.self_node.node_id} shutting down.")
