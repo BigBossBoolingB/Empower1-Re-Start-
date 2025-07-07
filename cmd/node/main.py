@@ -32,6 +32,7 @@ def print_help():
     print("  addpeer <http_address>                       - Manually add and connect to a peer")
     print("  mywallet                                     - Display this node's wallet info")
     print("  stake <amount>                               - Register/update stake for this node's wallet")
+    print("  validators                                   - Display current validator set information")
     print("  help                                         - Show this help message")
     print("  exit                                         - Shutdown the node")
     print("-" * 40)
@@ -110,10 +111,20 @@ def main():
                     if len(cmd_input) > 1:
                         try:
                             stake_amount = float(cmd_input[1])
-                            if stake_amount > 0: blockchain.register_validator_wallet(node_wallet, stake_amount)
-                            else: print("Stake amount must be positive.")
-                        except ValueError: print("Invalid stake amount.")
-                    else: print("Usage: stake <amount>")
+                            if stake_amount <= 0: # Stake must be positive to register or add
+                                print("Stake amount must be positive.")
+                            else:
+                                # The register_validator_wallet method in Blockchain now uses add_or_update_validator_stake
+                                # which handles both new registration and stake updates.
+                                # It uses the global VALIDATOR_WALLETS and USER_PUBLIC_KEYS.
+                                # This method is suitable.
+                                blockchain.register_validator_wallet(node_wallet, stake_amount)
+                                # The method itself prints confirmation or errors.
+                                print(f"Stake command processed for {stake_amount} {NATIVE_CURRENCY_SYMBOL}.")
+                        except ValueError:
+                            print("Invalid stake amount format.")
+                    else:
+                        print("Usage: stake <amount>")
                 elif command == "transfer":
                     if len(cmd_input) >= 3:
                         receiver_addr = cmd_input[1]
@@ -150,9 +161,14 @@ def main():
                         except ValueError: print("Invalid amount for faucet.")
                     else: print(f"Usage: faucet <address> <amount>")
                 elif command == "mine":
+                    # mine_pending_transactions now checks if this node is the selected validator
                     mined_block = blockchain.mine_pending_transactions()
-                    if mined_block: print(f"Mined Block #{mined_block.index} by {mined_block.validator_address[:10]}... Hash: {mined_block.hash[:10]}...")
-                    # else: # mine_pending_transactions prints reasons if it fails or nothing to mine
+                    if mined_block:
+                        print(f"Successfully Mined Block #{mined_block.index} by {mined_block.validator_address[:10]}... Hash: {mined_block.hash[:10]}...")
+                    else:
+                        # Blockchain.mine_pending_transactions already logs reasons for not mining
+                        # (e.g., not selected, no pending tx, no active validators)
+                        print("Mining attempt complete. Check logs for details if no block was mined.")
                 elif command == "chain":
                     print("\nCurrent Blockchain:"); [print(f"  {b!r}") for i, b in enumerate(blockchain.chain)]; print("-" * 40)
                 elif command == "pending":
@@ -169,6 +185,19 @@ def main():
                 elif command == "addpeer":
                     if len(cmd_input) > 1: network_manager.connect_to_peer(cmd_input[1])
                     else: print("Usage: addpeer <http_address_of_peer>")
+                elif command == "validators":
+                    print("\nValidators from ValidatorManager:")
+                    if blockchain.validator_manager and blockchain.validator_manager.validators:
+                        for addr, val_obj in blockchain.validator_manager.validators.items():
+                            print(f"  - Address: {val_obj.wallet_address}")
+                            print(f"    Stake: {val_obj.stake}, Active: {val_obj.is_active}")
+                            print(f"    Last Produced TS: {val_obj.last_block_produced_timestamp}")
+                            print(f"    Public Key (short): {val_obj.public_key_hex[:15]}...")
+                        if not blockchain.validator_manager.validators:
+                            print("  No validators currently registered in the manager.")
+                    else:
+                        print("  ValidatorManager not available or no validators.")
+                    print("-" * 40)
                 else: print(f"Unknown command: {command}. Type 'help'.")
             except EOFError: running = False; print("\nShutting down (EOF)...")
             except KeyboardInterrupt: running = False; print("\nShutting down (Ctrl+C)...")

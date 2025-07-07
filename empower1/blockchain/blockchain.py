@@ -53,8 +53,17 @@ class Blockchain:
         self.balances[self.node_wallet.address] = initial_supply_epc
         self.total_supply_epc = initial_supply_epc
         logging.info(f"GENESIS_DBG: Initial {initial_supply_epc} {self.NATIVE_CURRENCY_SYMBOL} allocated to genesis validator {self.node_wallet.address}. Balance: {self.balances[self.node_wallet.address]}")
-        logging.info(f"GENESIS_DBG: USER_PUBLIC_KEYS after genesis wallet init: {list(USER_PUBLIC_KEYS.keys())}")
-        logging.info(f"GENESIS_DBG: VALIDATOR_WALLETS after genesis wallet init: {list(VALIDATOR_WALLETS.keys())}")
+
+        # Register genesis validator with a substantial stake
+        genesis_stake_amount = initial_supply_epc / 2 # Example: stake half of the initial allocation
+        self.validator_manager.add_or_update_validator_stake(
+            validator_wallet_address=self.node_wallet.address,
+            public_key_hex=self.node_wallet.get_public_key_hex(),
+            stake_change=genesis_stake_amount
+        )
+        logging.info(f"GENESIS_DBG: Genesis validator {self.node_wallet.address} registered with stake {genesis_stake_amount}.")
+        logging.info(f"GENESIS_DBG: USER_PUBLIC_KEYS after genesis wallet init: {list(USER_PUBLIC_KEYS.keys())}") # USER_PUBLIC_KEYS updated by Wallet()
+        logging.info(f"GENESIS_DBG: VALIDATOR_WALLETS after genesis wallet init: {list(VALIDATOR_WALLETS.keys())}") # VALIDATOR_WALLETS updated by Wallet()
 
     @property
     def last_block(self) -> Block:
@@ -131,22 +140,30 @@ class Blockchain:
             self.network_interface.broadcast_transaction(transaction)
         return True
 
-    def mine_pending_transactions(self) -> Block | None: # No docstring to update for this method
+    def mine_pending_transactions(self) -> Block | None:
         selected_validator_obj = self.validator_manager.select_next_validator()
+
         if not selected_validator_obj:
-            print(f"DEBUG MINE: No active validator selected. ValidatorManager active list: {self.validator_manager._active_validator_addresses_round_robin}")
+            logging.info(f"MINE_LOGIC: No active validator selected by ValidatorManager. Active list: {self.validator_manager._active_validator_addresses_round_robin}")
             return None
 
         selected_validator_address = selected_validator_obj.wallet_address
-        print(f"DEBUG MINE: Selected validator: {selected_validator_address}")
-        validator_wallet = VALIDATOR_WALLETS.get(selected_validator_address)
+        logging.info(f"MINE_LOGIC: ValidatorManager selected: {selected_validator_address}")
 
+        # Check if this node is the selected validator
+        if self.node_wallet.address != selected_validator_address:
+            logging.info(f"MINE_LOGIC: This node ({self.node_wallet.address}) is not the selected validator ({selected_validator_address}). Cannot mine.")
+            # In a real PoS system, we might just not attempt, or another mechanism handles proposing.
+            # For this simulation, if not selected, this node doesn't mine.
+            return None
+
+        validator_wallet = VALIDATOR_WALLETS.get(selected_validator_address)
         if not validator_wallet:
-            print(f"DEBUG MINE: Wallet for selected validator {selected_validator_address} not found in VALIDATOR_WALLETS global. Known: {list(VALIDATOR_WALLETS.keys())}")
+            logging.error(f"MINE_LOGIC: Wallet for selected validator {selected_validator_address} not found in VALIDATOR_WALLETS global. Known: {list(VALIDATOR_WALLETS.keys())}")
             return None
 
         if not self.pending_transactions:
-            print(f"DEBUG MINE: No pending transactions for validator {selected_validator_address} to mine.")
+            logging.info(f"MINE_LOGIC: No pending transactions for validator {selected_validator_address} to mine.")
             return None
         print(f"DEBUG MINE: {len(self.pending_transactions)} pending transactions found.")
 
@@ -199,6 +216,9 @@ class Blockchain:
         mined_tx_ids = {tx.transaction_id for tx in new_block.transactions}
         self.pending_transactions = [ptx for ptx in self.pending_transactions if ptx.transaction_id not in mined_tx_ids]
 
+        # The ValidatorManager's select_next_validator method already calls record_block_production on the validator object.
+        # So, no explicit call needed here.
+
         if self.network_interface:
             self.network_interface.broadcast_block(new_block)
         return new_block
@@ -249,14 +269,24 @@ class Blockchain:
                     print(f"Error: Public key for validator {current_block.validator_address} (Block {current_block.index}) not found.")
                     return False
 
-                validator_in_manager = self.validator_manager.get_validator(current_block.validator_address)
-                if not validator_in_manager:
+                # Check with ValidatorManager
+                validator_obj_from_manager = self.validator_manager.get_validator(current_block.validator_address)
+                if not validator_obj_from_manager:
                     print(f"Error: Validator {current_block.validator_address} (Block {current_block.index}) not found in ValidatorManager.")
                     return False
-                # Active status check for historical blocks is complex; current check is simplified.
-                # if not validator_in_manager.is_active:
-                #     print(f"Error: Validator {current_block.validator_address} (Block {current_block.index}) is not currently active.")
-                #     return False
+
+                # For a strict PoS, we might check if the validator was active *at the time the block was made*.
+                # For simplicity now, we check if they are *currently known* and *generally active* based on current stake.
+                # A more advanced check would involve historical stake and activity status.
+                # For now, we'll rely on the fact that only active validators should be able to produce blocks
+                # that get accepted by the network. If a block from an inactive validator is found,
+                # it might indicate an issue or a past state where they were active.
+                # A simple check: if the validator is in the manager, it's "known". Active status check can be added.
+                if not validator_obj_from_manager.is_active:
+                     # This check might be too strict for historical blocks if a validator becomes inactive later.
+                     # For now, let's log a warning instead of failing hard, unless it's the most recent block.
+                     # print(f"Warning: Validator {current_block.validator_address} (Block {current_block.index}) is not currently active in manager.")
+                     pass # Decided to not fail hard on this for now for simplicity of historical validation.
 
                 if not current_block.verify_block_signature(validator_public_key_hex):
                     print(f"Error: Block {current_block.index} has an invalid validator signature.")

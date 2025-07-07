@@ -110,16 +110,30 @@ def empty_blockchain_real_genesis():
     return Blockchain(node_wallet=fixture_genesis_wallet)
 
 @pytest.fixture
-def blockchain_with_one_validator(empty_blockchain_real_genesis, validator_wallet):
+def blockchain_with_one_validator(validator_wallet): # Removed empty_blockchain_real_genesis dependency
     """
-    Returns a Blockchain with the genesis block and one registered validator.
+    Returns a Blockchain instance where 'validator_wallet' is the node's main wallet
+    (and thus the genesis validator) and is also explicitly registered.
     """
-    bc = empty_blockchain_real_genesis
-    # Register the validator_wallet. This also populates USER_PUBLIC_KEYS and VALIDATOR_WALLETS
-    # for this validator within the Blockchain instance's context (if it uses these globals).
-    bc.register_validator_wallet(validator_wallet, stake_amount=1000)
-    return bc
+    USER_PUBLIC_KEYS.clear() # Ensure clean global state for this fixture
+    VALIDATOR_WALLETS.clear()
 
+    # Initialize Blockchain with validator_wallet as its node_wallet
+    # This makes validator_wallet the genesis validator and funds it.
+    bc = Blockchain(node_wallet=validator_wallet)
+
+    # The Blockchain constructor already registers the node_wallet (genesis validator) with a stake.
+    # We can assert this or adjust if needed.
+    # For clarity, let's ensure it's registered with a specific testable stake if the default genesis stake isn't what we want for other tests.
+    # The current genesis stake is initial_supply / 2 = 500,000. This is likely sufficient.
+    # If an explicit call to register_validator_wallet is needed, it would update the stake.
+    # For this fixture's purpose, the auto-registration at genesis is probably fine.
+    # Let's verify:
+    assert bc.validator_manager.get_validator(validator_wallet.address) is not None
+    assert bc.validator_manager.get_validator(validator_wallet.address).stake > 0
+    assert bc.validator_manager.get_validator(validator_wallet.address).is_active is True
+
+    return bc
 
 @pytest.fixture
 def blockchain_with_transactions_pending(blockchain_with_one_validator, alice_wallet, bob_wallet, charlie_wallet, validator_wallet): # Added validator_wallet

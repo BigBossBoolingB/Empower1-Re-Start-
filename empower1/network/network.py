@@ -223,6 +223,16 @@ class Network:
             if any(b.hash==rb.hash for b in self.blockchain.chain):return True
             cl=len(self.blockchain.chain);lb=self.blockchain.last_block
             is_direct_extension=(rb.index==cl and (lb and rb.previous_hash==lb.hash or cl==0 and rb.previous_hash=="0" and rb.index==0))
+
+            # Validate validator with ValidatorManager
+            validator_obj = self.blockchain.validator_manager.get_validator(rb.validator_address)
+            if not validator_obj:
+                print(f"DBG HRB: Validator {rb.validator_address} (Block {rb.index}) not found in local ValidatorManager.", flush=True)
+                return False
+            # if not validator_obj.is_active: # Potentially too strict for blocks not at the tip
+            #     print(f"DBG HRB: Validator {rb.validator_address} (Block {rb.index}) is not active in local ValidatorManager.", flush=True)
+            #     return False # Or handle differently, e.g. if chain sync, this might be ok for older blocks
+
             vpk=USER_PUBLIC_KEYS.get(rb.validator_address)
             if not vpk:print(f"DBG HRB: Val PK {rb.validator_address} not found. Known: {list(USER_PUBLIC_KEYS.keys())}", flush=True);return False
             # Block hash is calculated on instantiation. Here we verify if the received hash matches a recalculation.
@@ -298,18 +308,31 @@ class Network:
             temp_validated_pc = []
             for i in range(len(pc)):
                 cb=pc[i]
-                print(f"!!! DBG HCR Node {self.self_node.port}: Validating prospective block {i}, Val: {cb.validator_address}, Hash: {cb.hash[:7]}", flush=True)
+                print(f"!!! DBG HCR Node {self.self_node.port}: Validating prospective block {i}, Val: {cb.validator_address}, Hash: {cb.hash[:7]}", flush=True) # Changed self.node to self.self_node
                 # cb.hash is what was received. cb.calculate_hash() is based on its current (deserialized) content.
-                if cb.hash!=cb.calculate_hash():print(f"!!! DBG HCR Node {self.node.port}: Hash mismatch B{i}. Stored: {cb.hash}, Recalc: {cb.calculate_hash()}", flush=True);valid_pc=False;break
+                if cb.hash!=cb.calculate_hash():print(f"!!! DBG HCR Node {self.self_node.port}: Hash mismatch B{i}. Stored: {cb.hash}, Recalc: {cb.calculate_hash()}", flush=True);valid_pc=False;break # Changed self.node to self.self_node
+
+                # Validator checks using the *receiving node's* validator_manager
+                # This assumes the validator_manager state is consistent or gets updated appropriately for chain sync.
+                # For initial sync, the validator_manager might be empty or only have self.
+                # A full sync might need to rebuild validator_manager state based on the new chain too.
+                # For now, a simple check if validator is known (PK exists). Stricter checks later.
+                current_validator_obj = self.blockchain.validator_manager.get_validator(cb.validator_address) # Check against local VM
+                # if not current_validator_obj:
+                #     print(f"!!! DBG HCR Node {self.self_node.port}: Validator {cb.validator_address} for B{i} not in local manager. This might be okay during initial sync if PK is known.", flush=True) # Corrected here for consistency
+                    # valid_pc = False; break # This might be too strict if PK is globally known via USER_PUBLIC_KEYS
+
                 vpk=USER_PUBLIC_KEYS.get(cb.validator_address)
+                if not vpk: print(f"!!! DBG HCR Node {self.self_node.port}: Missing PK for B{i} validator {cb.validator_address}. My Keys: {list(USER_PUBLIC_KEYS.keys())}", flush=True); valid_pc=False; break # Corrected self.node to self.self_node
+
                 if i==0:
                     if cb.index!=0 or cb.previous_hash!="0":print(f"!!! DBG HCR Node {self.self_node.port}: Invalid G B{i} idx/prevH", flush=True);valid_pc=False;break
-                    if not vpk: print(f"!!! DBG HCR Node {self.self_node.port}: Missing PK for G validator {cb.validator_address}. My Keys: {list(USER_PUBLIC_KEYS.keys())}", flush=True);valid_pc=False;break
+                    # No need to check vpk again here, done above
                     if not cb.verify_block_signature(vpk):print(f"!!! DBG HCR Node {self.self_node.port}: Invalid G B{i} sig for {cb.validator_address}", flush=True);valid_pc=False;break
                 else:
                     pb=temp_validated_pc[i-1]
                     if cb.previous_hash!=pb.hash or cb.index!=len(temp_validated_pc):print(f"!!! DBG HCR Node {self.self_node.port}: Link/Idx mismatch B{i}", flush=True);valid_pc=False;break
-                    if not vpk: print(f"!!! DBG HCR Node {self.self_node.port}: Missing PK for B{i} validator {cb.validator_address}. My Keys: {list(USER_PUBLIC_KEYS.keys())}", flush=True); valid_pc=False; break
+                    # No need to check vpk again here, done above
                     if not cb.verify_block_signature(vpk):print(f"!!! DBG HCR Node {self.self_node.port}: Invalid B{i} sig for {cb.validator_address}", flush=True);valid_pc=False;break
                 for tx_idx, tx in enumerate(cb.transactions):
                     # print(f"!!! DBG HCR Node {self.self_node.port}: Validating B{i}/Tx{tx_idx}, Sender: {tx.sender_address}", flush=True)

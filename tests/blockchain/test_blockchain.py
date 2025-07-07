@@ -25,7 +25,14 @@ def test_blockchain_initialization_crypto(empty_blockchain_real_genesis):
 
     assert len(bc.pending_transactions) == 0
     assert isinstance(bc.validator_manager, ValidatorManager)
-    assert len(bc.validator_manager.validators) == 0
+    # Genesis validator should be registered
+    assert len(bc.validator_manager.validators) == 1
+    genesis_validator_in_manager = bc.validator_manager.get_validator(genesis_block.validator_address)
+    assert genesis_validator_in_manager is not None
+    assert genesis_validator_in_manager.wallet_address == genesis_block.validator_address
+    assert genesis_validator_in_manager.public_key_hex == genesis_validator_pub_key
+    assert genesis_validator_in_manager.stake == bc.total_supply_epc / 2 # As per _create_and_sign_genesis_block logic
+    assert genesis_validator_in_manager.is_active is True # Should be active with this stake
 
     assert bc.total_supply_epc == 1_000_000.0
     assert bc.balances.get(genesis_block.validator_address) == 1_000_000.0
@@ -46,12 +53,14 @@ def test_last_block_property_crypto(blockchain_with_one_validator, alice_wallet,
     tx.sign(genesis_val_wallet)
     assert bc.add_transaction(tx, USER_PUBLIC_KEYS[genesis_validator_addr])
 
-    validator_obj = bc.validator_manager.get_validator(validator_wallet.address)
-    assert validator_obj is not None
+    # The miner should be bc.node_wallet (which is the genesis validator for this bc instance)
+    expected_miner_validator_obj = bc.validator_manager.get_validator(bc.node_wallet.address)
+    assert expected_miner_validator_obj is not None
+    assert expected_miner_validator_obj.is_active is True
 
-    with patch.object(bc.validator_manager, 'select_next_validator', return_value=validator_obj):
+    with patch.object(bc.validator_manager, 'select_next_validator', return_value=expected_miner_validator_obj):
         mined_block = bc.mine_pending_transactions()
-        assert mined_block is not None
+        assert mined_block is not None, f"Mining failed. Selected validator by mock: {expected_miner_validator_obj.wallet_address}, bc.node_wallet: {bc.node_wallet.address}"
         assert bc.last_block == mined_block
         assert bc.last_block.index == 1
 
@@ -208,10 +217,13 @@ def test_is_chain_valid_crypto_focus(alice_wallet, bob_wallet):
     tx_fund_bob.sign(gen_val_wallet)
     assert bc_for_validation_test.add_transaction(tx_fund_bob, USER_PUBLIC_KEYS[gen_val_addr])
 
-    validator_obj = bc_for_validation_test.validator_manager.get_validator(val_for_test.address)
-    with patch.object(bc_for_validation_test.validator_manager, 'select_next_validator', return_value=validator_obj):
+    # The miner for this blockchain instance is bc_node_wallet
+    expected_miner_obj_block1 = bc_for_validation_test.validator_manager.get_validator(bc_node_wallet.address)
+    assert expected_miner_obj_block1 is not None
+
+    with patch.object(bc_for_validation_test.validator_manager, 'select_next_validator', return_value=expected_miner_obj_block1):
         block1 = bc_for_validation_test.mine_pending_transactions()
-    assert block1 is not None
+    assert block1 is not None, "Block1 mining failed"
     assert bc_for_validation_test.is_chain_valid() is True
 
     tx_a_to_b = Transaction(alice_wallet.address, bob_wallet.address, 10.0, asset_id=Blockchain.NATIVE_CURRENCY_SYMBOL)
@@ -224,9 +236,15 @@ def test_is_chain_valid_crypto_focus(alice_wallet, bob_wallet):
     tx_b_to_c.sign(bob_wallet)
     assert bc_for_validation_test.add_transaction(tx_b_to_c, USER_PUBLIC_KEYS[bob_wallet.address])
 
-    with patch.object(bc_for_validation_test.validator_manager, 'select_next_validator', return_value=validator_obj):
+    # val_for_test could be the miner for the second block if selected by round-robin,
+    # or we can explicitly select bc_node_wallet again.
+    # For this test, let's assume bc_node_wallet mines again.
+    expected_miner_obj_block2 = bc_for_validation_test.validator_manager.get_validator(bc_node_wallet.address)
+    assert expected_miner_obj_block2 is not None
+
+    with patch.object(bc_for_validation_test.validator_manager, 'select_next_validator', return_value=expected_miner_obj_block2):
         block2 = bc_for_validation_test.mine_pending_transactions()
-    assert block2 is not None
+    assert block2 is not None, "Block2 mining failed"
     assert bc_for_validation_test.is_chain_valid() is True
 
 
@@ -263,3 +281,81 @@ def test_blockchain_repr_crypto(blockchain_with_transactions_pending): # Uses th
     assert "Block(Index: 0" in repr_str
     assert "Block(Index: 1" in repr_str
     assert "Block(Index: 2" in repr_str
+
+
+def test_mine_pending_transactions_respects_selected_validator(empty_blockchain_real_genesis, alice_wallet, bob_wallet):
+    """
+    Tests that mine_pending_transactions only allows the selected validator to mine.
+    """
+    bc = empty_blockchain_real_genesis # bc.node_wallet is genesis validator (val_g)
+    val_g_addr = bc.node_wallet.address
+    val_g_pk = bc.node_wallet.get_public_key_hex()
+
+    # val_g is already registered with stake during genesis creation by empty_blockchain_real_genesis
+    assert bc.validator_manager.get_validator(val_g_addr) is not None
+    assert bc.validator_manager.get_validator(val_g_addr).is_active is True
+
+    # Register a second validator (val_2)
+    val_2 = Wallet()
+    USER_PUBLIC_KEYS[val_2.address] = val_2.get_public_key_hex()
+    VALIDATOR_WALLETS[val_2.address] = val_2
+    bc.register_validator_wallet(val_2, stake_amount=bc.validator_manager.min_stake_active + 100)
+    assert bc.validator_manager.get_validator(val_2.address) is not None
+    assert bc.validator_manager.get_validator(val_2.address).is_active is True
+
+    active_validators = bc.validator_manager._active_validator_addresses_round_robin
+    assert len(active_validators) == 2 # val_g and val_2
+
+    # Add a pending transaction
+    # Ensure val_g (genesis validator) has its public key in USER_PUBLIC_KEYS for add_transaction
+    if val_g_addr not in USER_PUBLIC_KEYS: # Should have been added by Wallet() or Blockchain init
+        USER_PUBLIC_KEYS[val_g_addr] = val_g_pk
+
+    tx_fund_alice = Transaction(val_g_addr, alice_wallet.address, 10.0, asset_id=Blockchain.NATIVE_CURRENCY_SYMBOL)
+    tx_fund_alice.sign(VALIDATOR_WALLETS[val_g_addr]) # Sign with the actual genesis wallet from VALIDATOR_WALLETS
+    assert bc.add_transaction(tx_fund_alice, val_g_pk)
+    assert len(bc.pending_transactions) == 1
+
+    # Scenario 1: This node (val_g) is NOT selected to mine
+    # Mock select_next_validator to return val_2
+    with patch.object(bc.validator_manager, 'select_next_validator', return_value=bc.validator_manager.get_validator(val_2.address)):
+        mined_block_by_other = bc.mine_pending_transactions()
+        assert mined_block_by_other is None, "Node should not have mined as it was not selected."
+        assert len(bc.chain) == 1 # Still only genesis block
+        assert len(bc.pending_transactions) == 1 # Transaction should still be pending
+
+    # Scenario 2: This node (val_g) IS selected to mine
+    # Mock select_next_validator to return val_g (bc.node_wallet)
+    with patch.object(bc.validator_manager, 'select_next_validator', return_value=bc.validator_manager.get_validator(val_g_addr)):
+        mined_block_by_self = bc.mine_pending_transactions()
+        assert mined_block_by_self is not None, "Node should have mined as it was selected."
+        assert len(bc.chain) == 2 # Genesis + new block
+        assert mined_block_by_self.validator_address == val_g_addr
+        assert len(bc.pending_transactions) == 0 # Transaction should be mined
+
+    # Scenario 3: No active validators (e.g., all stakes removed or set inactive)
+    # Get the actual Validator objects to modify their is_active status
+    val_g_obj = bc.validator_manager.get_validator(val_g_addr)
+    val_2_obj = bc.validator_manager.get_validator(val_2.address)
+    if val_g_obj: val_g_obj.is_active = False
+    if val_2_obj: val_2_obj.is_active = False
+    bc.validator_manager._rebuild_active_validator_list_for_round_robin() # Force update of active list
+
+    # Add another transaction (ensure val_g has funds or this will fail at add_transaction)
+    # For this test, val_g has already spent 10.0 from its initial stake for the first tx.
+    # The genesis stake was initial_supply / 2. Let's assume it's enough.
+    if val_g_addr not in USER_PUBLIC_KEYS: # Ensure PK is known
+        USER_PUBLIC_KEYS[val_g_addr] = val_g_pk
+
+    tx_fund_bob = Transaction(val_g_addr, bob_wallet.address, 5.0, asset_id=Blockchain.NATIVE_CURRENCY_SYMBOL)
+    tx_fund_bob.sign(VALIDATOR_WALLETS[val_g_addr])
+    # We need to add to pending transactions for mine_pending_transactions to attempt mining
+    assert bc.add_transaction(tx_fund_bob, val_g_pk), "Failed to add second tx for no-active-validator test"
+
+    mined_block_no_active = bc.mine_pending_transactions()
+    assert mined_block_no_active is None, "Mining should fail if no active validators can be selected."
+
+    # Restore active status for cleanup if other tests use these validators from globals (important!)
+    if val_g_obj: val_g_obj.is_active = True
+    if val_2_obj: val_2_obj.is_active = True
+    bc.validator_manager._rebuild_active_validator_list_for_round_robin()

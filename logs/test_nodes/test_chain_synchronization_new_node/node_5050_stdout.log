@@ -1,21 +1,20 @@
 Consensus package initialized.
 Network package initialized.
 ValidatorManager initialized. Min stake for active: 100.0
-CMD_MAIN_DBG Node 5050: Node Wallet Address: Emp102891659bc083036199a9001e32e5719b3a98b7f
-CMD_MAIN_DBG Node 5050: Blockchain Genesis Validator: Emp102891659bc083036199a9001e32e5719b3a98b7f
+New validator registered: Emp1e4a914d9a4d6b74da479fb5648375f26b85a2b06 with stake 500000.0
+Validator Emp1e4a914d9a4d6b74da479fb5648375f26b85a2b06 active status changed to: True (Stake: 500000.0)
+CMD_MAIN_DBG Node 5050: Node Wallet Address: Emp1e4a914d9a4d6b74da479fb5648375f26b85a2b06
+CMD_MAIN_DBG Node 5050: Blockchain Genesis Validator: Emp1e4a914d9a4d6b74da479fb5648375f26b85a2b06
 CMD_MAIN_DBG Node 5050: Balance of Node Wallet: 1000000.0
 CMD_MAIN_DBG Node 5050: Balance of Genesis Validator: 1000000.0
 CMD_MAIN_DBG Node 5050: Is Node Wallet the Genesis Validator? True
  * Serving Flask app 'empower1.network.network'
  * Debug mode: off
-New validator registered: Emp102891659bc083036199a9001e32e5719b3a98b7f with stake 100.0
-Validator Emp102891659bc083036199a9001e32e5719b3a98b7f active status changed to: True (Stake: 100.0)
-DEBUG MINE: Selected validator: Emp102891659bc083036199a9001e32e5719b3a98b7f
+Validator Emp1e4a914d9a4d6b74da479fb5648375f26b85a2b06 stake updated to 500100.0
 DEBUG MINE: 1 pending transactions found.
-Block #1 mined by Emp102891659bc083036199a9001e32e5719b3a98b7f with 1 txs.
-DEBUG MINE: Selected validator: Emp102891659bc083036199a9001e32e5719b3a98b7f
+Block #1 mined by Emp1e4a914d9a4d6b74da479fb5648375f26b85a2b06 with 1 txs.
 DEBUG MINE: 1 pending transactions found.
-Block #2 mined by Emp102891659bc083036199a9001e32e5719b3a98b7f with 1 txs.
+Block #2 mined by Emp1e4a914d9a4d6b74da479fb5648375f26b85a2b06 with 1 txs.
 !!! DBG Node 5050: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5051
 !!! DBG Node 5050: connect_to_peer called for http://127.0.0.1:5051
 !!! DBG Node 5050: Attempting to add peer http://127.0.0.1:5051

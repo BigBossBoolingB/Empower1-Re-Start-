@@ -89,6 +89,30 @@ class Validator:
     def __hash__(self):
         return hash(self.wallet_address)
 
+    def to_dict(self) -> dict:
+        """Returns a dictionary representation of the Validator."""
+        return {
+            "wallet_address": self.wallet_address,
+            "public_key_hex": self.public_key_hex,
+            "stake": self.stake,
+            "last_block_produced_timestamp": self.last_block_produced_timestamp,
+            "is_active": self.is_active,
+            "joined_timestamp": self.joined_timestamp
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        """Creates a Validator instance from a dictionary."""
+        validator = cls(
+            wallet_address=data['wallet_address'],
+            public_key_hex=data['public_key_hex'],
+            stake=data.get('stake', 0.0)
+        )
+        validator.last_block_produced_timestamp = data.get('last_block_produced_timestamp', 0.0)
+        validator.is_active = data.get('is_active', False)
+        validator.joined_timestamp = data.get('joined_timestamp', time.time()) # Default to now if missing
+        return validator
+
 if __name__ == '__main__':
     # Requires Wallet to be importable for a full demo with real addresses/keys
     # from empower1.wallet import Wallet # Assume this path works if run from project root

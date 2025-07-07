@@ -102,3 +102,44 @@ def test_validator_repr():
     assert "Stake: 123.45" in repr_str
     assert "Active: True" in repr_str
     assert "LastProdTS: 1678886400" in repr_str # .0f format
+
+def test_validator_to_dict_from_dict():
+    """Test serialization to dict and deserialization from dict."""
+    original_ts = time.time()
+    v_orig = Validator(VALID_ADDR, VALID_PK_HEX, 150.5)
+    v_orig.is_active = True
+    v_orig.last_block_produced_timestamp = original_ts - 1000 # A past time
+    # joined_timestamp is set on init
+
+    v_dict = v_orig.to_dict()
+    expected_keys = ["wallet_address", "public_key_hex", "stake",
+                     "last_block_produced_timestamp", "is_active", "joined_timestamp"]
+    assert all(key in v_dict for key in expected_keys)
+    assert v_dict["wallet_address"] == v_orig.wallet_address
+    assert v_dict["public_key_hex"] == v_orig.public_key_hex
+    assert v_dict["stake"] == v_orig.stake
+    assert v_dict["is_active"] == v_orig.is_active
+    assert v_dict["last_block_produced_timestamp"] == v_orig.last_block_produced_timestamp
+    assert v_dict["joined_timestamp"] == v_orig.joined_timestamp
+
+    v_new = Validator.from_dict(v_dict)
+    assert v_new.wallet_address == v_orig.wallet_address
+    assert v_new.public_key_hex == v_orig.public_key_hex
+    assert v_new.stake == v_orig.stake
+    assert v_new.is_active == v_orig.is_active
+    assert v_new.last_block_produced_timestamp == v_orig.last_block_produced_timestamp
+    assert v_new.joined_timestamp == v_orig.joined_timestamp # Ensure joined_timestamp is also handled
+
+    # Test from_dict with minimal data (relying on defaults in from_dict)
+    minimal_data = {
+        "wallet_address": "MinAddr",
+        "public_key_hex": "MinPK"
+        # stake, last_block_produced_timestamp, is_active, joined_timestamp use defaults
+    }
+    v_minimal = Validator.from_dict(minimal_data)
+    assert v_minimal.wallet_address == "MinAddr"
+    assert v_minimal.public_key_hex == "MinPK"
+    assert v_minimal.stake == 0.0
+    assert v_minimal.is_active is False
+    assert v_minimal.last_block_produced_timestamp == 0.0
+    assert isinstance(v_minimal.joined_timestamp, float) # Should default to current time
