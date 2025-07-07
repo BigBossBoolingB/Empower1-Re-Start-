@@ -2,8 +2,9 @@ import pytest
 import time
 import hashlib
 from empower1.blockchain.block import Block
-from empower1.blockchain.transaction import Transaction # For creating transaction instances for blocks
-from empower1.blockchain.wallet import Wallet # For validator signing
+from empower1.blockchain.transaction import Transaction
+from empower1.blockchain.wallet import Wallet
+from empower1.blockchain import constants as block_test_constants # Moved import to top
 
 # Test basic Block creation and attributes with crypto
 def test_block_creation_crypto(sample_transaction_signed, another_sample_transaction_signed, validator_wallet):
@@ -51,11 +52,15 @@ def test_block_creation_crypto(sample_transaction_signed, another_sample_transac
     assert block.calculate_hash() == block.hash
 
 
+from empower1.blockchain import constants as block_test_constants # For atomic conversion
+
 def test_block_hashing_determinism(validator_wallet):
     """Test that block hash is deterministic for same content."""
     ts = time.time()
-    tx1 = Transaction(validator_wallet.address, "receiver1", 1.0, timestamp=ts-10)
-    tx1.sign(validator_wallet) # Sign with some wallet
+    amount_atomic = block_test_constants.to_atomic(1.0)
+    # Fee defaults to 0 (int) in Transaction constructor
+    tx1 = Transaction(validator_wallet.address, "receiver1", amount_atomic, timestamp=ts-10)
+    tx1.sign(validator_wallet)
 
     proof_val = "deterministic_proof"
     block1_data = {

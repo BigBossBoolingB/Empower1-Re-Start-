@@ -6,24 +6,24 @@ class Validator:
     """
     Represents a validator node in the EmPower1 Proof-of-Stake system.
     """
-    def __init__(self, wallet_address: str, public_key_hex: str, stake: float = 0.0):
+    def __init__(self, wallet_address: str, public_key_hex: str, stake: int = 0): # stake is now int (atomic units)
         """
         Initializes a Validator.
         Args:
             wallet_address (str): The wallet address of the validator. Used for identification and receiving rewards.
             public_key_hex (str): The public key (hex string) of the validator, used for verifying block signatures.
-            stake (float, optional): The amount of currency staked by this validator. Defaults to 0.0.
+            stake (int, optional): The amount of currency staked by this validator in atomic units. Defaults to 0.
         """
         if not wallet_address or not isinstance(wallet_address, str):
             raise ValueError("Validator wallet_address must be a non-empty string.")
         if not public_key_hex or not isinstance(public_key_hex, str): # Basic check, could validate hex format
             raise ValueError("Validator public_key_hex must be a non-empty string.")
-        if not isinstance(stake, (int, float)) or stake < 0:
-            raise ValueError("Validator stake must be a non-negative number.")
+        if not isinstance(stake, int) or stake < 0: # stake must be non-negative integer
+            raise ValueError("Validator stake must be a non-negative integer (atomic units).")
 
         self.wallet_address = wallet_address
         self.public_key_hex = public_key_hex
-        self.stake = float(stake)
+        self.stake: int = stake # Ensure type
 
         # Timestamp of the last block this validator proposed or was chosen to propose.
         # Can be used for round-robin or other fairness mechanisms.
@@ -38,32 +38,31 @@ class Validator:
         # self.penalties = 0
         # self.jailed_until_timestamp = 0
 
-    def update_stake(self, additional_stake: float = 0.0, new_total_stake: float = -1.0):
+    def update_stake(self, additional_stake: int = 0, new_total_stake: int = -1): # Amounts are now int
         """
-        Updates the validator's stake.
+        Updates the validator's stake in atomic units.
         Can either add to existing stake or set a new total stake.
         Args:
-            additional_stake (float): Amount to add to the current stake.
-            new_total_stake (float): If provided and non-negative, sets the stake to this value.
+            additional_stake (int): Amount in atomic units to add to the current stake.
+            new_total_stake (int): If provided and non-negative, sets the stake to this value in atomic units.
         """
-        if new_total_stake != -1.0:  # Check if new_total_stake was explicitly provided
-            if not isinstance(new_total_stake, (int, float)):
-                raise ValueError("New total stake must be a number.")
+        if new_total_stake != -1:  # Check if new_total_stake was explicitly provided
+            if not isinstance(new_total_stake, int):
+                raise ValueError("New total stake must be an integer (atomic units).")
             if new_total_stake < 0:
                 raise ValueError("New total stake cannot be negative.")
-            self.stake = float(new_total_stake)
+            self.stake = new_total_stake
         elif additional_stake != 0: # Only apply additional_stake if new_total_stake was not provided
-            if not isinstance(additional_stake, (int, float)):
-                raise ValueError("Additional stake must be a number.")
-            self.stake += float(additional_stake)
-            if self.stake < 0: # Ensure stake doesn't go negative from a negative additional_stake
-                self.stake = 0.0
-        # If both are defaults (new_total_stake=-1.0, additional_stake=0), stake remains unchanged.
+            if not isinstance(additional_stake, int):
+                raise ValueError("Additional stake must be an integer (atomic units).")
+            self.stake += additional_stake
+            if self.stake < 0: # Ensure stake doesn't go negative
+                self.stake = 0
+        # If both are defaults (new_total_stake=-1, additional_stake=0), stake remains unchanged.
 
-        # Final check, though above logic should prevent self.stake < 0 if new_total_stake is used.
-        # This is mainly for the case where only additional_stake is used and it's negative.
+        # Ensure stake is not negative after any operation.
         if self.stake < 0:
-            self.stake = 0.0
+            self.stake = 0
 
         # Note: Activating/deactivating based on stake changes would typically be handled
         # by the ValidatorManager.
@@ -106,7 +105,7 @@ class Validator:
         validator = cls(
             wallet_address=data['wallet_address'],
             public_key_hex=data['public_key_hex'],
-            stake=data.get('stake', 0.0)
+            stake=data.get('stake', 0) # Default to integer 0
         )
         validator.last_block_produced_timestamp = data.get('last_block_produced_timestamp', 0.0)
         validator.is_active = data.get('is_active', False)

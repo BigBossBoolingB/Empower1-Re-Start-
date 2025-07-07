@@ -2,39 +2,39 @@ import time
 import json # For deterministic serialization of metadata
 import hashlib
 from .wallet import Wallet # Updated to relative import
+from . import constants # Import constants
 
 class Transaction:
     """
     Represents a transaction in the EmPower1 Blockchain.
     Transactions are signed by the sender's wallet.
     """
-    def __init__(self, sender_address: str, receiver_address: str, amount: float,
-                 asset_id: str = "EPC", timestamp: float = None, # Default asset_id changed to EPC
-                 fee: float = 0.0, metadata: dict = None, signature_hex: str = None):
+    def __init__(self, sender_address: str, receiver_address: str, amount: int, # Amount is int (atomic units)
+                 asset_id: str = None, timestamp: float = None,
+                 fee: int = 0, metadata: dict = None, signature_hex: str = None): # Fee is int (atomic units)
         """
         Constructor for a Transaction.
         Args:
-            sender_address (str): The address of the sender (derived from their public key).
-                                  This public key (hex) will be used for signature verification.
+            sender_address (str): The address of the sender.
             receiver_address (str): The address of the receiver.
-            amount (float): The amount of the asset being transferred.
-            asset_id (str, optional): Identifier for the asset. Defaults to "empower_coin".
+            amount (int): The amount of the asset being transferred, in atomic units.
+            asset_id (str, optional): Identifier for the asset. Defaults to NATIVE_CURRENCY_SYMBOL.
             timestamp (float, optional): Time of transaction creation. Defaults to current time.
-            fee (float, optional): Transaction fee. Defaults to 0.0.
+            fee (int, optional): Transaction fee, in atomic units. Defaults to 0.
             metadata (dict, optional): Additional data for the transaction.
             signature_hex (str, optional): Hex-encoded DER signature of the transaction data.
-                                        Typically set by the `sign` method.
         """
-        self.sender_address = sender_address # This should be the Wallet address (derived from public key)
-                                        # The actual public key hex will be needed for verification if sender_address isn't it.
-                                        # For now, let's assume sender_address can be mapped to a public key by the Blockchain.
-                                        # Or, a `sender_public_key_hex` field could be added.
-                                        # For simplicity in this iteration, let's assume `sender_address` IS the public_key_hex for verification.
+        if not isinstance(amount, int) or amount < 0:
+            raise ValueError("Transaction amount must be a non-negative integer (atomic units).")
+        if not isinstance(fee, int) or fee < 0:
+            raise ValueError("Transaction fee must be a non-negative integer (atomic units).")
+
+        self.sender_address = sender_address
         self.receiver_address = receiver_address
-        self.amount = float(amount)
-        self.asset_id = asset_id
+        self.amount: int = amount
+        self.asset_id = asset_id if asset_id is not None else constants.NATIVE_CURRENCY_SYMBOL
         self.timestamp = timestamp or time.time()
-        self.fee = float(fee)
+        self.fee: int = fee
         self.metadata = metadata or {}
 
         # Signature is stored as hex string of DER-encoded bytes
@@ -50,12 +50,10 @@ class Transaction:
         The order of fields is important for determinism.
         Metadata is JSON serialized with sorted keys for determinism.
         """
-        # Ensure float precision is handled consistently if it varies by system
-        # For now, standard string conversion of float is used.
-        # For true financial applications, Decimal type or fixed-point arithmetic is better.
+        # Amount and fee are now integers (atomic units).
         data_string = (
-            f"{self.sender_address}{self.receiver_address}{self.amount:.8f}{self.asset_id}"
-            f"{self.timestamp:.6f}{self.fee:.8f}"
+            f"{self.sender_address}{self.receiver_address}{self.amount}{self.asset_id}"
+            f"{self.timestamp:.6f}{self.fee}" # Keep timestamp with fixed float format for consistency
             f"{json.dumps(self.metadata, sort_keys=True)}"
         )
         return data_string.encode('utf-8')
@@ -159,7 +157,7 @@ class Transaction:
             sender_address=tx_data['sender_address'],
             receiver_address=tx_data['receiver_address'],
             amount=tx_data['amount'],
-            asset_id=tx_data.get('asset_id', "empower_coin"),
+            asset_id=tx_data.get('asset_id', constants.NATIVE_CURRENCY_SYMBOL), # Use constant
             timestamp=tx_data.get('timestamp', time.time()), # Default if missing
             fee=tx_data.get('fee', 0.0),
             metadata=tx_data.get('metadata', {}),
@@ -180,9 +178,9 @@ if __name__ == '__main__':
     tx1 = Transaction(
         sender_address=alice_wallet.address, # This is Alice's Wallet Address
         receiver_address=bob_wallet.address,
-        amount=100.0,
-        asset_id="empower_coin",
-        fee=0.1,
+        amount=100_000_000, # Example: 100 EPC in atomic units (assuming 6 decimals)
+        asset_id=constants.NATIVE_CURRENCY_SYMBOL,
+        fee=10_000, # Example: 0.01 EPC in atomic units
         metadata={"message": "Payment for goods"}
     )
     print(f"\nCreated Transaction 1 (unsigned): {tx1}")
@@ -236,9 +234,10 @@ if __name__ == '__main__':
     stimulus_tx = Transaction(
         sender_address=system_wallet.address, # From system wallet
         receiver_address=alice_wallet.address, # To Alice
-        amount=25.0,
+        amount=25_000_000, # Example: 25 units in atomic (assuming 6 decimals for this asset too for demo)
         asset_id="empower_coin_stimulus",
         metadata={"type": "stimulus_payment", "batch_id": "B001"}
+        # Fee defaults to 0, which is an int.
     )
     stimulus_tx.sign(system_wallet)
     print(f"Stimulus Transaction (signed): {stimulus_tx}")

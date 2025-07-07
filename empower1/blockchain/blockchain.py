@@ -4,6 +4,7 @@ from .block import Block  # Updated to relative import
 from .transaction import Transaction  # Updated to relative import
 from .wallet import Wallet  # Updated to relative import
 import logging # Added import logging
+from . import constants # Import new constants file
 
 USER_PUBLIC_KEYS = {}
 VALIDATOR_WALLETS = {}
@@ -11,7 +12,7 @@ VALIDATOR_WALLETS = {}
 from empower1.consensus.manager import ValidatorManager # Remains absolute, sibling package
 
 class Blockchain:
-    NATIVE_CURRENCY_SYMBOL = "EPC" # Define native currency symbol
+    # NATIVE_CURRENCY_SYMBOL = "EPC" # Define native currency symbol - Will be replaced by constants.NATIVE_CURRENCY_SYMBOL
 
     def __init__(self, node_wallet: Wallet, network_interface=None): # Added node_wallet parameter
         self.node_wallet = node_wallet # Store the provided node_wallet
@@ -20,8 +21,8 @@ class Blockchain:
         self.validator_manager = ValidatorManager()
         self.network_interface = network_interface
 
-        self.balances: Dict[str, float] = {}
-        self.total_supply_epc: float = 0.0
+        self.balances: Dict[str, int] = {} # Store balances as integers (atomic units)
+        self.total_supply_epc: int = 0    # Store total supply as integer (atomic units)
 
         # Set these based on the provided node_wallet
         self.genesis_validator_wallet_address = self.node_wallet.address
@@ -48,22 +49,22 @@ class Blockchain:
         genesis_block.sign_block(self.node_wallet) # Sign with self.node_wallet
         self.chain.append(genesis_block)
 
-        initial_supply_epc = 1_000_000.0
-        # Fund the self.node_wallet (which is the genesis validator)
-        self.balances[self.node_wallet.address] = initial_supply_epc
-        self.total_supply_epc = initial_supply_epc
-        logging.info(f"GENESIS_DBG: Initial {initial_supply_epc} {self.NATIVE_CURRENCY_SYMBOL} allocated to genesis validator {self.node_wallet.address}. Balance: {self.balances[self.node_wallet.address]}")
+        # Use atomic units for initial supply and balance
+        self.balances[self.node_wallet.address] = constants.INITIAL_TOTAL_SUPPLY_EPC_ATOMIC
+        self.total_supply_epc = constants.INITIAL_TOTAL_SUPPLY_EPC_ATOMIC
+        logging.info(f"GENESIS_DBG: Initial {self.total_supply_epc} atomic units of {constants.NATIVE_CURRENCY_SYMBOL} allocated to genesis validator {self.node_wallet.address}. Balance: {self.balances[self.node_wallet.address]}")
 
-        # Register genesis validator with a substantial stake
-        genesis_stake_amount = initial_supply_epc / 2 # Example: stake half of the initial allocation
+        # Register genesis validator with a substantial stake (also in atomic units)
+        # Example: stake half of the initial allocation. Ensure this is an integer.
+        genesis_stake_amount_atomic = self.total_supply_epc // 2
         self.validator_manager.add_or_update_validator_stake(
             validator_wallet_address=self.node_wallet.address,
             public_key_hex=self.node_wallet.get_public_key_hex(),
-            stake_change=genesis_stake_amount
+            stake_change=genesis_stake_amount_atomic # Pass as int
         )
-        logging.info(f"GENESIS_DBG: Genesis validator {self.node_wallet.address} registered with stake {genesis_stake_amount}.")
-        logging.info(f"GENESIS_DBG: USER_PUBLIC_KEYS after genesis wallet init: {list(USER_PUBLIC_KEYS.keys())}") # USER_PUBLIC_KEYS updated by Wallet()
-        logging.info(f"GENESIS_DBG: VALIDATOR_WALLETS after genesis wallet init: {list(VALIDATOR_WALLETS.keys())}") # VALIDATOR_WALLETS updated by Wallet()
+        logging.info(f"GENESIS_DBG: Genesis validator {self.node_wallet.address} registered with stake {genesis_stake_amount_atomic} atomic units.")
+        logging.info(f"GENESIS_DBG: USER_PUBLIC_KEYS after genesis wallet init: {list(USER_PUBLIC_KEYS.keys())}")
+        logging.info(f"GENESIS_DBG: VALIDATOR_WALLETS after genesis wallet init: {list(VALIDATOR_WALLETS.keys())}")
 
     @property
     def last_block(self) -> Block:
@@ -77,21 +78,21 @@ class Blockchain:
         Args:
             transaction (Transaction): The transaction to process.
         Returns:
-            bool: True if the transaction was processed successfully (sufficient funds, EPC type),
+            bool: True if the transaction was processed successfully (sufficient funds, native currency type),
                   False otherwise.
         """
-        if transaction.asset_id != self.NATIVE_CURRENCY_SYMBOL:
+        if transaction.asset_id != constants.NATIVE_CURRENCY_SYMBOL:
             return True # Not an EPC transfer, so considered "processed" without state change for balances.
 
         sender_address = transaction.sender_address
         receiver_address = transaction.receiver_address
-        amount = transaction.amount # Already float from Transaction init
+        amount = transaction.amount # Now an int (atomic units)
 
-        sender_balance = self.balances.get(sender_address, 0.0)
+        sender_balance = self.balances.get(sender_address, 0) # Default to int 0
 
         # Validate funds (important: this check uses the current state of self.balances)
         if sender_balance < amount:
-            print(f"Transaction {transaction.transaction_id} state change failed: Sender {sender_address} has insufficient balance ({sender_balance} {self.NATIVE_CURRENCY_SYMBOL}) for amount {amount} {self.NATIVE_CURRENCY_SYMBOL}.")
+            print(f"Transaction {transaction.transaction_id} state change failed: Sender {sender_address} has insufficient balance ({sender_balance} {constants.NATIVE_CURRENCY_SYMBOL}) for amount {amount} {constants.NATIVE_CURRENCY_SYMBOL}.")
             return False
 
         self.balances[sender_address] = sender_balance - amount
@@ -118,12 +119,12 @@ class Blockchain:
         logging.debug(f"Add_transaction: Signature VERIFIED for tx {transaction.transaction_id}")
 
         # Pre-check for sufficient funds (against current confirmed balances) before adding to pending pool
-        if transaction.asset_id == self.NATIVE_CURRENCY_SYMBOL:
-            current_sender_balance = self.balances.get(transaction.sender_address, 0.0)
+        if transaction.asset_id == constants.NATIVE_CURRENCY_SYMBOL:
+            current_sender_balance = self.balances.get(transaction.sender_address, 0) # Default to int 0
             # Consider pending outgoing transactions from this sender to prevent double spending from mempool
             pending_outgoing_amount = sum(
                 tx.amount for tx in self.pending_transactions
-                if tx.sender_address == transaction.sender_address and tx.asset_id == self.NATIVE_CURRENCY_SYMBOL
+                if tx.sender_address == transaction.sender_address and tx.asset_id == constants.NATIVE_CURRENCY_SYMBOL
             )
             available_balance = current_sender_balance - pending_outgoing_amount
 
@@ -173,14 +174,14 @@ class Blockchain:
         valid_txs_for_block = []
 
         for tx in list(self.pending_transactions): # Iterate over a copy
-            if tx.asset_id == self.NATIVE_CURRENCY_SYMBOL:
-                sender_bal_snapshot = temp_balances_for_block.get(tx.sender_address, 0.0)
+            if tx.asset_id == constants.NATIVE_CURRENCY_SYMBOL:
+                sender_bal_snapshot = temp_balances_for_block.get(tx.sender_address, 0) # Default to int 0
                 if sender_bal_snapshot >= tx.amount:
                     temp_balances_for_block[tx.sender_address] = sender_bal_snapshot - tx.amount
-                    temp_balances_for_block[tx.receiver_address] = temp_balances_for_block.get(tx.receiver_address, 0.0) + tx.amount
+                    temp_balances_for_block[tx.receiver_address] = temp_balances_for_block.get(tx.receiver_address, 0) + tx.amount # Default to int 0
                     valid_txs_for_block.append(tx)
                 else:
-                    print(f"Tx {tx.transaction_id} by {tx.sender_address} for {tx.amount} EPC invalid due to insufficient funds ({sender_bal_snapshot} EPC) during mining. Removing from current block proposal.")
+                    print(f"Tx {tx.transaction_id} by {tx.sender_address} for {tx.amount} {constants.NATIVE_CURRENCY_SYMBOL} invalid due to insufficient funds ({sender_bal_snapshot} atomic units) during mining. Removing from current block proposal.")
                     # Optionally, remove from self.pending_transactions permanently if invalid even against confirmed state
                     # For now, just exclude from this block.
             else: # Non-EPC transactions are included if they passed initial add_transaction checks
@@ -314,13 +315,13 @@ class Blockchain:
                     return False
 
                 # Replay EPC transactions on temp_balances for consistency check
-                if tx.asset_id == self.NATIVE_CURRENCY_SYMBOL:
-                    sender_bal = temp_balances_for_validation.get(tx.sender_address, 0.0)
+                if tx.asset_id == constants.NATIVE_CURRENCY_SYMBOL:
+                    sender_bal = temp_balances_for_validation.get(tx.sender_address, 0) # Default to int 0
                     if sender_bal < tx.amount:
-                        print(f"Chain validation error: Tx {tx.transaction_id} in block {current_block.index} - insufficient funds for sender {tx.sender_address} during replay (Balance: {sender_bal}, Amount: {tx.amount}).")
+                        print(f"Chain validation error: Tx {tx.transaction_id} in block {current_block.index} - insufficient funds for sender {tx.sender_address} during replay (Balance: {sender_bal} atomic, Amount: {tx.amount} atomic).")
                         return False
                     temp_balances_for_validation[tx.sender_address] = sender_bal - tx.amount
-                    temp_balances_for_validation[tx.receiver_address] = temp_balances_for_validation.get(tx.receiver_address, 0.0) + tx.amount
+                    temp_balances_for_validation[tx.receiver_address] = temp_balances_for_validation.get(tx.receiver_address, 0) + tx.amount # Default to int 0
 
         # Compare replayed balances with actual self.balances (if chain has more than genesis)
         # This is a strong check. For very long chains, this might be slow.
@@ -342,21 +343,45 @@ class Blockchain:
         print("Blockchain is valid (cryptographically, structurally, and balance states consistent).")
         return True
 
-    def register_validator_wallet(self, validator_wallet: Wallet, stake_amount: float):
+    def register_validator_wallet(self, validator_wallet: Wallet, stake_amount_atomic: int): # Changed to int
         if not isinstance(validator_wallet, Wallet):
             print("Error: Invalid validator wallet object.")
             return
-        if stake_amount <= 0:
-            print("Initial stake amount must be positive for validator registration.")
+        if not isinstance(stake_amount_atomic, int) or stake_amount_atomic <= 0:
+            print("Stake amount must be a positive integer (atomic units).")
             return
 
         addr = validator_wallet.address
+        current_balance = self.balances.get(addr, 0)
+
+        if current_balance < stake_amount_atomic:
+            print(f"Error: Insufficient balance for {addr} to stake {stake_amount_atomic} atomic units. Has: {current_balance}")
+            return
+
+        # Deduct stake from balance
+        # TODO: Future - This should be part of an on-chain STAKE transaction processing.
+        # For now, direct balance deduction is used. ValidatorManager handles stake accumulation.
+        self.balances[addr] = current_balance - stake_amount_atomic
+
         pub_key_hex = validator_wallet.get_public_key_hex()
-        validator_obj = self.validator_manager.add_or_update_validator_stake(addr, pub_key_hex, stake_amount)
+        # The add_or_update_validator_stake in ValidatorManager now expects the *change* in stake or total.
+        # If it's the first time staking, stake_amount_atomic is the total.
+        # If updating, it's more complex if we only pass stake_amount_atomic as a new total.
+        # Let's assume add_or_update_validator_stake handles this by taking the full new stake amount.
+        # The current ValidatorManager.add_or_update_validator_stake expects `stake_change`.
+        # This means if a validator re-registers, it adds to existing stake in manager.
+        # This is acceptable for now.
+        validator_obj = self.validator_manager.add_or_update_validator_stake(addr, pub_key_hex, stake_amount_atomic)
 
         if validator_obj:
             VALIDATOR_WALLETS[addr] = validator_wallet
             USER_PUBLIC_KEYS[addr] = pub_key_hex
+            print(f"Validator {addr} stake updated by/set to {stake_amount_atomic} atomic units. New balance: {self.balances[addr]}")
+        else:
+            # If validator registration/update failed, revert balance deduction
+            self.balances[addr] = current_balance
+            print(f"Failed to update validator {addr} in manager. Balance deduction reverted.")
+
         # else: # Error already printed by add_or_update_validator_stake
 
     def __repr__(self):
@@ -391,10 +416,12 @@ if __name__ == '__main__':
 
     genesis_validator_wallet = VALIDATOR_WALLETS[genesis_validator_addr] # Get the actual wallet
 
-    tx1 = Transaction(genesis_validator_addr, wallet1.address, 1000.0, asset_id=Blockchain.NATIVE_CURRENCY_SYMBOL)
+    # Amounts are now atomic units. Assuming constants.DECIMALS for conversion.
+    tx1_amount_atomic = constants.to_atomic(1000.0)
+    tx1 = Transaction(genesis_validator_addr, wallet1.address, tx1_amount_atomic, asset_id=constants.NATIVE_CURRENCY_SYMBOL)
     tx1.sign(genesis_validator_wallet)
 
-    print(f"\nAttempting to add Tx1: {tx1.amount} {tx1.asset_id} from {tx1.sender_address[:10]} to {wallet1.address[:10]}")
+    print(f"\nAttempting to add Tx1: {tx1.amount} atomic units of {tx1.asset_id} from {tx1.sender_address[:10]} to {wallet1.address[:10]}")
     if bc.add_transaction(tx1, USER_PUBLIC_KEYS[genesis_validator_addr]):
         print("Tx1 added to pending pool.")
     else:
@@ -402,8 +429,14 @@ if __name__ == '__main__':
     print("Balances before mining:", bc.balances) # Should be unchanged yet
 
     node_cli_wallet = wallet1
-    bc.register_validator_wallet(node_cli_wallet, 200.0)
-    print(f"Node wallet {node_cli_wallet.address[:10]} staked 200.0 EPC.")
+    stake_amount_atomic = constants.to_atomic(200.0)
+    # The register_validator_wallet in Blockchain calls ValidatorManager.add_or_update_validator_stake,
+    # which now expects int for stake_change.
+    # However, Blockchain.register_validator_wallet itself still has type hint float for stake_amount.
+    # This needs to be harmonized. For now, let's assume register_validator_wallet will handle conversion or be updated.
+    # Let's update register_validator_wallet to expect int.
+    bc.register_validator_wallet(node_cli_wallet, stake_amount_atomic)
+    print(f"Node wallet {node_cli_wallet.address[:10]} staked {stake_amount_atomic} atomic units.")
 
     # Ensure the validator manager knows about the genesis validator if it might be selected
     # (though typically genesis validator doesn't participate beyond genesis)
@@ -429,9 +462,10 @@ if __name__ == '__main__':
     print(bc)
 
     # Test another transaction
-    tx2 = Transaction(wallet1.address, wallet2.address, 50.0, asset_id=Blockchain.NATIVE_CURRENCY_SYMBOL)
+    tx2_amount_atomic = constants.to_atomic(50.0)
+    tx2 = Transaction(wallet1.address, wallet2.address, tx2_amount_atomic, asset_id=constants.NATIVE_CURRENCY_SYMBOL)
     tx2.sign(wallet1)
-    print(f"\nAttempting to add Tx2: {tx2.amount} {tx2.asset_id} from {wallet1.address[:10]} to {wallet2.address[:10]}")
+    print(f"\nAttempting to add Tx2: {tx2.amount} atomic units of {tx2.asset_id} from {wallet1.address[:10]} to {wallet2.address[:10]}")
     if bc.add_transaction(tx2, USER_PUBLIC_KEYS[wallet1.address]):
         print("Tx2 added to pending pool.")
     else:
@@ -448,18 +482,20 @@ if __name__ == '__main__':
     else:
         print("Second mining failed.")
 
-    print("\nBalances after second mining:", bc.balances)
+    print("\nBalances after second mining (atomic units):", bc.balances)
     print(f"Chain valid: {bc.is_chain_valid()}")
     print(bc)
 
-    expected_genesis_bal = initial_supply_epc - 1000.0
-    expected_wallet1_bal = 1000.0 - 50.0
-    expected_wallet2_bal = 50.0
-    print(f"\nExpected Balances Check:")
-    print(f"Genesis ({genesis_validator_addr[:10]}): Expected={expected_genesis_bal}, Actual={bc.balances.get(genesis_validator_addr)}")
-    print(f"Wallet1 ({wallet1.address[:10]}): Expected={expected_wallet1_bal}, Actual={bc.balances.get(wallet1.address)}")
-    print(f"Wallet2 ({wallet2.address[:10]}): Expected={expected_wallet2_bal}, Actual={bc.balances.get(wallet2.address)}")
+    # Balances are now in atomic units
+    expected_genesis_bal_atomic = constants.INITIAL_TOTAL_SUPPLY_EPC_ATOMIC - tx1_amount_atomic
+    expected_wallet1_bal_atomic = tx1_amount_atomic - tx2_amount_atomic
+    expected_wallet2_bal_atomic = tx2_amount_atomic
 
-    assert bc.balances.get(genesis_validator_addr) == expected_genesis_bal
-    assert bc.balances.get(wallet1.address) == expected_wallet1_bal
-    assert bc.balances.get(wallet2.address) == expected_wallet2_bal
+    print(f"\nExpected Balances Check (atomic units):")
+    print(f"Genesis ({genesis_validator_addr[:10]}): Expected={expected_genesis_bal_atomic}, Actual={bc.balances.get(genesis_validator_addr)}")
+    print(f"Wallet1 ({wallet1.address[:10]}): Expected={expected_wallet1_bal_atomic}, Actual={bc.balances.get(wallet1.address)}")
+    print(f"Wallet2 ({wallet2.address[:10]}): Expected={expected_wallet2_bal_atomic}, Actual={bc.balances.get(wallet2.address)}")
+
+    assert bc.balances.get(genesis_validator_addr) == expected_genesis_bal_atomic
+    assert bc.balances.get(wallet1.address) == expected_wallet1_bal_atomic
+    assert bc.balances.get(wallet2.address) == expected_wallet2_bal_atomic

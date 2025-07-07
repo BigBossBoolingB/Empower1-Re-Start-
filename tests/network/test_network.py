@@ -11,9 +11,13 @@ from empower1.blockchain.blockchain import Blockchain, USER_PUBLIC_KEYS, VALIDAT
 from empower1.blockchain.transaction import Transaction
 from empower1.blockchain.wallet import Wallet
 
+from empower1.blockchain import constants as net_test_constants # For atomic conversions
+
 # --- Helper to create a basic, signed transaction ---
-def create_signed_transaction(sender_wallet: Wallet, receiver_address: str, amount: float = 1.0, asset_id: str = "EMP") -> Transaction:
-    tx = Transaction(sender_wallet.address, receiver_address, amount, asset_id=asset_id)
+def create_signed_transaction(sender_wallet: Wallet, receiver_address: str, amount: float = 1.0, asset_id: str = net_test_constants.NATIVE_CURRENCY_SYMBOL) -> Transaction:
+    amount_atomic = net_test_constants.to_atomic(amount)
+    # Fee defaults to 0 in Transaction constructor, which is a valid int
+    tx = Transaction(sender_wallet.address, receiver_address, amount_atomic, asset_id=asset_id)
     tx.sign(sender_wallet)
     USER_PUBLIC_KEYS[sender_wallet.address] = sender_wallet.get_public_key_hex()
     return tx

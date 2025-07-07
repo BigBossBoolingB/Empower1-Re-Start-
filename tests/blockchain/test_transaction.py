@@ -6,29 +6,34 @@ from empower1.blockchain.transaction import Transaction
 from empower1.blockchain.wallet import Wallet # Needed for signing
 
 # Test basic Transaction creation and attributes with new crypto integration
+from empower1.blockchain import constants # Import constants Moved to top
+
 def test_transaction_creation_crypto(alice_wallet, bob_wallet):
     """Test Transaction creation with sender/receiver addresses, amount, etc."""
+    amount_atomic = constants.to_atomic(50.0)
+    fee_atomic = constants.to_atomic(0.05)
+
     tx = Transaction(
         sender_address=alice_wallet.address,
         receiver_address=bob_wallet.address,
-        amount=50.0,
-        asset_id="EMP_CryptoCoin",
-        fee=0.05,
+        amount=amount_atomic,
+        asset_id="EMP_CryptoCoin", # Using a custom asset ID for this test
+        fee=fee_atomic,
         metadata={"reason": "Crypto test payment"}
     )
     assert tx.sender_address == alice_wallet.address
     assert tx.receiver_address == bob_wallet.address
-    assert tx.amount == 50.0
+    assert tx.amount == amount_atomic
     assert tx.asset_id == "EMP_CryptoCoin"
-    assert tx.fee == 0.05
+    assert tx.fee == fee_atomic
     assert tx.metadata == {"reason": "Crypto test payment"}
     assert tx.timestamp is not None
     assert tx.signature_hex is None # Signature is None until signed
 
-    # Test transaction_id calculation
+    # Test transaction_id calculation (amount and fee are now integers in the string)
     expected_data_for_signing = (
-        f"{alice_wallet.address}{bob_wallet.address}{50.0:.8f}{'EMP_CryptoCoin'}"
-        f"{tx.timestamp:.6f}{0.05:.8f}"
+        f"{alice_wallet.address}{bob_wallet.address}{amount_atomic}{'EMP_CryptoCoin'}"
+        f"{tx.timestamp:.6f}{fee_atomic}"
         f"{json.dumps({'reason': 'Crypto test payment'}, sort_keys=True)}"
     ).encode('utf-8')
     expected_tx_id = hashlib.sha256(expected_data_for_signing).hexdigest()
@@ -36,27 +41,30 @@ def test_transaction_creation_crypto(alice_wallet, bob_wallet):
 
 def test_transaction_creation_minimal_crypto(alice_wallet, bob_wallet):
     """Test minimal Transaction creation."""
-    tx = Transaction(sender_address=alice_wallet.address, receiver_address=bob_wallet.address, amount=5.0)
+    amount_atomic = constants.to_atomic(5.0)
+    tx = Transaction(sender_address=alice_wallet.address, receiver_address=bob_wallet.address, amount=amount_atomic)
     assert tx.sender_address == alice_wallet.address
     assert tx.receiver_address == bob_wallet.address
-    assert tx.amount == 5.0
-    assert tx.asset_id == "EPC" # Default asset_id updated
-    assert tx.fee == 0.0 # Default fee
+    assert tx.amount == amount_atomic
+    assert tx.asset_id == constants.NATIVE_CURRENCY_SYMBOL # Default asset_id from constants
+    assert tx.fee == 0 # Default fee is int 0
     assert tx.metadata == {} # Default metadata
 
 def test_get_data_for_signing_determinism(alice_wallet, bob_wallet):
     """Test that get_data_for_signing is deterministic."""
     ts = time.time()
+    amount_atomic = constants.to_atomic(10.0)
+    fee_atomic = constants.to_atomic(0.1)
     tx1_data = {
         "sender_address": alice_wallet.address, "receiver_address": bob_wallet.address,
-        "amount": 10.0, "asset_id": "coin", "timestamp": ts, "fee": 0.1,
-        "metadata": {"b": 2, "a": 1} # Order should be fixed by json.dumps(sort_keys=True)
+        "amount": amount_atomic, "asset_id": "coin", "timestamp": ts, "fee": fee_atomic,
+        "metadata": {"b": 2, "a": 1}
     }
     tx1 = Transaction(**tx1_data)
 
-    tx2_data = { # Same data, different metadata order initially
+    tx2_data = {
         "sender_address": alice_wallet.address, "receiver_address": bob_wallet.address,
-        "amount": 10.0, "asset_id": "coin", "timestamp": ts, "fee": 0.1,
+        "amount": amount_atomic, "asset_id": "coin", "timestamp": ts, "fee": fee_atomic,
         "metadata": {"a": 1, "b": 2}
     }
     tx2 = Transaction(**tx2_data)
@@ -67,12 +75,14 @@ def test_get_data_for_signing_determinism(alice_wallet, bob_wallet):
 # Test signing and verification
 def test_transaction_signing_and_verification(alice_wallet, bob_wallet):
     """Test signing a transaction and then verifying it successfully."""
+    amount_atomic = constants.to_atomic(100.0)
     tx = Transaction(
         sender_address=alice_wallet.address,
         receiver_address=bob_wallet.address,
-        amount=100.0,
+        amount=amount_atomic,
         asset_id="EMP_Main",
         metadata={"memo": "Lunch money"}
+        # Fee defaults to 0 (atomic)
     )
     assert tx.signature_hex is None
 
@@ -86,10 +96,11 @@ def test_transaction_signing_and_verification(alice_wallet, bob_wallet):
 
 def test_transaction_verification_fail_wrong_key(alice_wallet, bob_wallet):
     """Test that verification fails if the wrong public key is used."""
+    amount_atomic = constants.to_atomic(10.0)
     tx = Transaction(
         sender_address=alice_wallet.address,
         receiver_address=bob_wallet.address,
-        amount=10.0
+        amount=amount_atomic
     )
     tx.sign(alice_wallet) # Signed by Alice
 
@@ -99,34 +110,34 @@ def test_transaction_verification_fail_wrong_key(alice_wallet, bob_wallet):
 
 def test_transaction_verification_fail_tampered_data(alice_wallet, bob_wallet):
     """Test that verification fails if transaction data is tampered after signing."""
+    amount_atomic_orig = constants.to_atomic(20.0)
     tx = Transaction(
         sender_address=alice_wallet.address,
         receiver_address=bob_wallet.address,
-        amount=20.0,
+        amount=amount_atomic_orig,
         metadata={"original": True}
     )
     tx.sign(alice_wallet)
     original_signature_hex = tx.signature_hex
 
     # Tamper with data (e.g., amount)
-    tx.amount = 200.0
-    # Note: The signature_hex is still the old one.
-    # The transaction_id would also change if recalculated, but verify_signature uses get_data_for_signing()
+    tx.amount = constants.to_atomic(200.0) # Change to a different atomic amount
 
     alice_public_key_hex = alice_wallet.get_public_key_hex()
     assert tx.verify_signature(sender_public_key_hex=alice_public_key_hex) is False
 
     # Restore amount, verify it works again
-    tx.amount = 20.0
+    tx.amount = amount_atomic_orig
     assert tx.verify_signature(sender_public_key_hex=alice_public_key_hex) is True
-    assert tx.signature_hex == original_signature_hex # Ensure signature wasn't re-signed by mistake
+    assert tx.signature_hex == original_signature_hex
 
 def test_transaction_verification_fail_no_signature(alice_wallet, bob_wallet):
     """Test verification fails if the transaction is not signed."""
+    amount_atomic = constants.to_atomic(5.0)
     tx = Transaction(
         sender_address=alice_wallet.address,
         receiver_address=bob_wallet.address,
-        amount=5.0
+        amount=amount_atomic
     )
     assert tx.signature_hex is None
     alice_public_key_hex = alice_wallet.get_public_key_hex()

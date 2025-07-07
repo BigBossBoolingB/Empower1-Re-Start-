@@ -8,16 +8,18 @@ from empower1.consensus.validator import Validator
 # For now, ValidatorManager relies on external Wallet objects for signing if needed by Blockchain.
 # It primarily manages Validator data objects.
 
-MIN_STAKE_TO_BE_ACTIVE = 100.0 # Example minimum stake
+# Example minimum stake in atomic units (e.g., 100 EPC if 6 decimals = 100 * 10^6)
+MIN_STAKE_TO_BE_ACTIVE_ATOMIC = 100_000_000
 
 class ValidatorManager:
     """
     Manages the collection of validators, their stakes, and selects block producers.
+    Stakes are handled in atomic units.
     """
-    def __init__(self, min_stake_active: float = MIN_STAKE_TO_BE_ACTIVE):
+    def __init__(self, min_stake_active: int = MIN_STAKE_TO_BE_ACTIVE_ATOMIC): # Now int
         # Stores Validator objects, keyed by their wallet_address
         self.validators: Dict[str, Validator] = {}
-        self.min_stake_active = min_stake_active
+        self.min_stake_active: int = min_stake_active # Ensure type
 
         # For round-robin selection, keep a sorted list of active validator addresses
         self._active_validator_addresses_round_robin: List[str] = []
@@ -29,40 +31,40 @@ class ValidatorManager:
         """Retrieves a validator by their wallet address."""
         return self.validators.get(validator_wallet_address)
 
-    def add_or_update_validator_stake(self, validator_wallet_address: str, public_key_hex: str, stake_change: float):
+    def add_or_update_validator_stake(self, validator_wallet_address: str, public_key_hex: str, stake_change: int): # stake_change is now int
         """
-        Adds a new validator or updates the stake of an existing one.
+        Adds a new validator or updates the stake of an existing one (in atomic units).
         Args:
             validator_wallet_address (str): The validator's unique wallet address.
             public_key_hex (str): The validator's public key hex.
-            stake_change (float): The amount to add to the stake (can be negative to reduce stake).
+            stake_change (int): The amount in atomic units to add to the stake (can be negative).
         Returns:
             Optional[Validator]: The updated or new Validator object, or None if error.
         """
         if not validator_wallet_address or not public_key_hex:
             print("Error: Validator address and public key hex are required.")
             return None
+        if not isinstance(stake_change, int):
+            # Or attempt conversion, but stricter is better for internal consistency
+            print("Error: stake_change must be an integer (atomic units).")
+            return None
 
         validator = self.validators.get(validator_wallet_address)
         if not validator:
-            # New validator, ensure initial stake is not negative from stake_change
             if stake_change < 0:
                 print(f"Error: Cannot initialize validator {validator_wallet_address} with negative stake contribution.")
                 return None
+            # Validator class now expects stake as int
             validator = Validator(wallet_address=validator_wallet_address, public_key_hex=public_key_hex, stake=stake_change)
             self.validators[validator_wallet_address] = validator
-            print(f"New validator registered: {validator.wallet_address} with stake {validator.stake}")
+            print(f"New validator registered: {validator.wallet_address} with stake {validator.stake} atomic units.")
         else:
-            # Existing validator, update stake
-            if validator.public_key_hex != public_key_hex: #Consistency check
+            if validator.public_key_hex != public_key_hex:
                 print(f"Warning: Public key for existing validator {validator_wallet_address} does not match provided. Using existing.")
 
-            new_stake_value = validator.stake + stake_change
-            if new_stake_value < 0:
-                print(f"Error: Stake for {validator_wallet_address} cannot be reduced below zero (current: {validator.stake}, change: {stake_change}).")
-                return None # Or set to 0 and deactivate
-            validator.update_stake(new_total_stake=new_stake_value)
-            print(f"Validator {validator.wallet_address} stake updated to {validator.stake}")
+            # Validator.update_stake expects int
+            validator.update_stake(additional_stake=stake_change)
+            print(f"Validator {validator.wallet_address} stake updated to {validator.stake} atomic units.")
 
         # Update active status and rebuild round-robin list
         self._update_validator_active_status(validator)
@@ -131,19 +133,23 @@ class ValidatorManager:
             print(f"Warning: Unknown validator selection strategy '{strategy}'. Defaulting to round-robin.")
             return self.select_next_validator_round_robin()
 
-    def set_minimum_stake(self, min_stake: float):
-        """Sets a new minimum stake and re-evaluates active statuses."""
-        if min_stake < 0:
-            raise ValueError("Minimum stake cannot be negative.")
-        self.min_stake_active = min_stake
-        print(f"Minimum stake to be active set to: {self.min_stake_active}")
+    def set_minimum_stake(self, min_stake_atomic: int): # now int
+        """Sets a new minimum stake (in atomic units) and re-evaluates active statuses."""
+        if not isinstance(min_stake_atomic, int) or min_stake_atomic < 0:
+            raise ValueError("Minimum stake must be a non-negative integer (atomic units).")
+        self.min_stake_active = min_stake_atomic
+        print(f"Minimum stake to be active set to: {self.min_stake_active} atomic units.")
         for validator in self.validators.values():
             self._update_validator_active_status(validator)
         self._rebuild_active_validator_list_for_round_robin()
 
 
 if __name__ == '__main__':
-    manager = ValidatorManager(min_stake_active=100.0)
+    # Assuming constants.DECIMALS is accessible or defined for to_atomic
+    # For standalone __main__, let's define a simple to_atomic or use large integers directly.
+    # For simplicity, we'll use large integers representing atomic units.
+    # MIN_STAKE_TO_BE_ACTIVE_ATOMIC is already defined in the module.
+    manager = ValidatorManager(min_stake_active=MIN_STAKE_TO_BE_ACTIVE_ATOMIC) # Uses atomic
 
     # Dummy data for standalone run
     class DemoWallet:
@@ -155,10 +161,14 @@ if __name__ == '__main__':
     wallet_val2 = DemoWallet(2)
     wallet_val3 = DemoWallet(3)
 
-    # Add validators
-    manager.add_or_update_validator_stake(wallet_val1.address, wallet_val1.public_key_hex, 150.0) # Active
-    manager.add_or_update_validator_stake(wallet_val2.address, wallet_val2.public_key_hex, 50.0)  # Inactive
-    manager.add_or_update_validator_stake(wallet_val3.address, wallet_val3.public_key_hex, 200.0) # Active
+    # Add validators with atomic units for stake
+    # Assuming 6 decimals for display consistency if these were from floats:
+    # 150.0 -> 150_000_000
+    # 50.0  -> 50_000_000
+    # 200.0 -> 200_000_000
+    manager.add_or_update_validator_stake(wallet_val1.address, wallet_val1.public_key_hex, 150_000_000)
+    manager.add_or_update_validator_stake(wallet_val2.address, wallet_val2.public_key_hex, 50_000_000)
+    manager.add_or_update_validator_stake(wallet_val3.address, wallet_val3.public_key_hex, 200_000_000)
 
     print("\nActive validators:", [v.wallet_address for v in manager.get_active_validators()])
     assert len(manager.get_active_validators()) == 2
@@ -181,7 +191,7 @@ if __name__ == '__main__':
 
 
     print("\n--- Updating Stake for Validator 2 to become active ---")
-    manager.add_or_update_validator_stake(wallet_val2.address, wallet_val2.public_key_hex, 100.0) # Now 50 + 100 = 150, active
+    manager.add_or_update_validator_stake(wallet_val2.address, wallet_val2.public_key_hex, 100_000_000) # 50M + 100M = 150M (active)
     assert manager.get_validator(wallet_val2.address).is_active is True
     print("Active validators:", [v.wallet_address for v in manager.get_active_validators()])
     assert len(manager.get_active_validators()) == 3
@@ -197,7 +207,7 @@ if __name__ == '__main__':
 
 
     print("\n--- Reducing Stake for Validator 1 to become inactive ---")
-    manager.add_or_update_validator_stake(wallet_val1.address, wallet_val1.public_key_hex, -100.0) # Now 150 - 100 = 50, inactive
+    manager.add_or_update_validator_stake(wallet_val1.address, wallet_val1.public_key_hex, -100_000_000) # 150M - 100M = 50M (inactive)
     assert manager.get_validator(wallet_val1.address).is_active is False
     print("Active validators:", [v.wallet_address for v in manager.get_active_validators()])
     assert len(manager.get_active_validators()) == 2

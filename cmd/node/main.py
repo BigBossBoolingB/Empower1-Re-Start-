@@ -14,8 +14,10 @@ from empower1.blockchain.wallet import Wallet
 from empower1.blockchain.transaction import Transaction
 from empower1.network.network import Network
 from empower1.network.messages import MessageType
+from empower1.blockchain import constants as blockchain_constants # Import constants
 
-NATIVE_CURRENCY_SYMBOL = Blockchain.NATIVE_CURRENCY_SYMBOL
+# NATIVE_CURRENCY_SYMBOL = Blockchain.NATIVE_CURRENCY_SYMBOL # Old way
+NATIVE_CURRENCY_SYMBOL = blockchain_constants.NATIVE_CURRENCY_SYMBOL # New way
 
 def print_help():
     print("\nEmPower1 Blockchain Node CLI")
@@ -106,58 +108,74 @@ def main():
                 elif command == "mywallet":
                     print(f"  Address: {node_wallet.address}")
                     print(f"  Public Key: {node_wallet.get_public_key_hex(compressed=True)}")
-                    print(f"  {NATIVE_CURRENCY_SYMBOL} Balance: {blockchain.balances.get(node_wallet.address, 0.0)}")
+                    balance_atomic = blockchain.balances.get(node_wallet.address, 0)
+                    balance_formatted = blockchain_constants.from_atomic(balance_atomic)
+                    print(f"  {NATIVE_CURRENCY_SYMBOL} Balance: {balance_formatted:.{blockchain_constants.DECIMALS}f} ({balance_atomic} atomic units)")
                 elif command == "stake":
                     if len(cmd_input) > 1:
                         try:
-                            stake_amount = float(cmd_input[1])
-                            if stake_amount <= 0: # Stake must be positive to register or add
+                            stake_amount_float = float(cmd_input[1])
+                            if stake_amount_float <= 0:
                                 print("Stake amount must be positive.")
                             else:
-                                # The register_validator_wallet method in Blockchain now uses add_or_update_validator_stake
-                                # which handles both new registration and stake updates.
-                                # It uses the global VALIDATOR_WALLETS and USER_PUBLIC_KEYS.
-                                # This method is suitable.
-                                blockchain.register_validator_wallet(node_wallet, stake_amount)
-                                # The method itself prints confirmation or errors.
-                                print(f"Stake command processed for {stake_amount} {NATIVE_CURRENCY_SYMBOL}.")
+                                stake_amount_atomic = blockchain_constants.to_atomic(stake_amount_float)
+                                # blockchain.register_validator_wallet now expects atomic units (int)
+                                blockchain.register_validator_wallet(node_wallet, stake_amount_atomic)
+                                # Method blockchain.register_validator_wallet prints its own confirmations/errors.
+                                print(f"Stake command for {stake_amount_float} {NATIVE_CURRENCY_SYMBOL} ({stake_amount_atomic} atomic) processed.")
                         except ValueError:
-                            print("Invalid stake amount format.")
+                            print("Invalid stake amount format. Please enter a number.")
                     else:
                         print("Usage: stake <amount>")
                 elif command == "transfer":
                     if len(cmd_input) >= 3:
                         receiver_addr = cmd_input[1]
                         try:
-                            amount = float(cmd_input[2])
+                            amount_float = float(cmd_input[2])
+                            if amount_float <= 0: print("Transfer amount must be positive."); continue
+                            amount_atomic = blockchain_constants.to_atomic(amount_float)
+
                             asset_id = cmd_input[3] if len(cmd_input) > 3 else NATIVE_CURRENCY_SYMBOL
                             metadata_str = " ".join(cmd_input[4:]) if len(cmd_input) > 4 else "{}"
                             metadata = json.loads(metadata_str) if metadata_str else {}
-                            if amount <=0: print("Transfer amount must be positive."); continue
-                            new_tx = Transaction(node_wallet.address, receiver_addr, amount, asset_id, metadata=metadata)
+
+                            new_tx = Transaction(
+                                sender_address=node_wallet.address,
+                                receiver_address=receiver_addr,
+                                amount=amount_atomic,  # Use atomic amount
+                                asset_id=asset_id,
+                                metadata=metadata
+                                # Fee defaults to 0 (atomic) in Transaction constructor
+                            )
                             new_tx.sign(node_wallet)
                             if blockchain.add_transaction(new_tx, node_wallet.get_public_key_hex()):
-                                 print(f"Transaction {new_tx.transaction_id[:10]}... submitted.")
-                            # else: print(f"Failed to submit transaction (check balance/logs).") # add_transaction prints errors
-                        except ValueError: print("Invalid amount.")
+                                 print(f"Transaction {new_tx.transaction_id[:10]}... (Amount: {amount_atomic} atomic {asset_id}) submitted.")
+                            # else: add_transaction prints errors
+                        except ValueError: print("Invalid amount format. Please enter a number.")
                         except json.JSONDecodeError: print("Invalid metadata JSON string.")
                     else: print(f"Usage: transfer <receiver_addr> <amount> [{NATIVE_CURRENCY_SYMBOL}|asset_id] [metadata_json]")
                 elif command == "getbalance":
                     if len(cmd_input) > 1:
                         addr_to_check = cmd_input[1]
-                        balance = blockchain.balances.get(addr_to_check, 0.0)
-                        print(f"Balance of {addr_to_check}: {balance} {NATIVE_CURRENCY_SYMBOL}")
+                        balance_atomic = blockchain.balances.get(addr_to_check, 0) # Balances are atomic
+                        balance_formatted = blockchain_constants.from_atomic(balance_atomic)
+                        print(f"Balance of {addr_to_check}: {balance_formatted:.{blockchain_constants.DECIMALS}f} {NATIVE_CURRENCY_SYMBOL} ({balance_atomic} atomic units)")
                     else: print("Usage: getbalance <address>")
                 elif command == "faucet":
                     if len(cmd_input) > 2:
                         try:
-                            faucet_addr = cmd_input[1]; faucet_amount = float(cmd_input[2])
-                            if faucet_amount <=0: print("Faucet amount must be positive."); continue
-                            blockchain.balances[faucet_addr] = blockchain.balances.get(faucet_addr, 0.0) + faucet_amount
-                            blockchain.total_supply_epc += faucet_amount
-                            print(f"Added {faucet_amount} {NATIVE_CURRENCY_SYMBOL} to {faucet_addr}. New total: {blockchain.total_supply_epc}")
+                            faucet_addr = cmd_input[1]
+                            faucet_amount_float = float(cmd_input[2])
+                            if faucet_amount_float <= 0: print("Faucet amount must be positive."); continue
+                            faucet_amount_atomic = blockchain_constants.to_atomic(faucet_amount_float)
+
+                            blockchain.balances[faucet_addr] = blockchain.balances.get(faucet_addr, 0) + faucet_amount_atomic
+                            blockchain.total_supply_epc += faucet_amount_atomic # Ensure total_supply is also atomic
+
+                            print(f"Added {faucet_amount_float} {NATIVE_CURRENCY_SYMBOL} ({faucet_amount_atomic} atomic units) to {faucet_addr}.")
+                            print(f"New total supply: {blockchain_constants.from_atomic(blockchain.total_supply_epc):.{blockchain_constants.DECIMALS}f} {NATIVE_CURRENCY_SYMBOL} ({blockchain.total_supply_epc} atomic units).")
                             if faucet_addr not in USER_PUBLIC_KEYS and faucet_addr.startswith("Emp1"):
-                                 print(f"Warning: {faucet_addr} may not have a known public key.")
+                                 print(f"Warning: {faucet_addr} may not have a known public key for typical transactions.")
                         except ValueError: print("Invalid amount for faucet.")
                     else: print(f"Usage: faucet <address> <amount>")
                 elif command == "mine":

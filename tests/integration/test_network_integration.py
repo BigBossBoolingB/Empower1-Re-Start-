@@ -191,7 +191,7 @@ def test_chain_synchronization_new_node(running_nodes_manager, project_root_dir_
         stake_amount = 100.0
         # Ensure node_a_wallet_addr_from_ping has enough from genesis allocation for this stake
         stake_resp = node_api_post(node_a_port, "/debug_stake_self", data={"amount": stake_amount})
-        assert stake_resp and "staked" in stake_resp.get("message", ""), f"Staking Node A failed: {stake_resp}"
+        assert stake_resp and "stake processed" in stake_resp.get("message", "").lower(), f"Staking Node A failed: {stake_resp}" # Intention: Un-indent this line
 
         for i in range(2):
             tx_data = {"receiver_address": f"Emp1_DummyReceiver_SyncTest_Block{i+1}", "amount": float(i + 1.5)}

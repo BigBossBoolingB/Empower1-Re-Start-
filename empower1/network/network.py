@@ -77,12 +77,16 @@ class Network:
             d=request.get_json(); E="error"; M="message"
             if not d or'amount'not in d:return jsonify({E:"Missing amount"}),400
             try:
-                sa=float(d['amount']);
-                if sa<=0:return jsonify({E:"Stake must be positive"}),400
-                self.blockchain.register_validator_wallet(self.node_wallet_for_operations,sa)
-                VALIDATOR_WALLETS[self.node_wallet_for_operations.address]=self.node_wallet_for_operations
-                return jsonify({M:f"Node {self.self_node.node_id} staked {sa}"}),200
-            except ValueError:return jsonify({E:"Invalid stake amount"}),400
+                from empower1.blockchain import constants as net_constants # Import constants
+                stake_amount_float=float(d['amount']);
+                if stake_amount_float<=0:return jsonify({E:"Stake must be positive"}),400
+                stake_amount_atomic = net_constants.to_atomic(stake_amount_float)
+
+                # register_validator_wallet now expects atomic units
+                self.blockchain.register_validator_wallet(self.node_wallet_for_operations,stake_amount_atomic)
+                # VALIDATOR_WALLETS population is handled by register_validator_wallet if successful
+                return jsonify({M:f"Node {self.self_node.node_id} stake processed for {stake_amount_float} {net_constants.NATIVE_CURRENCY_SYMBOL} ({stake_amount_atomic} atomic)."}),200
+            except ValueError:return jsonify({E:"Invalid stake amount format."}),400
             except Exception as e:return jsonify({E:f"Staking failed: {str(e)}"}),500
         @self.app.route('/debug_create_tx', methods=['POST'])
         def debug_create_tx():
@@ -90,26 +94,46 @@ class Network:
             d=request.get_json();E="error";M="message"
             if not d or'receiver_address'not in d or'amount'not in d:return jsonify({E:"Missing receiver or amount"}),400
             try:
-                r=d['receiver_address'];amt=float(d['amount']);aid=d.get('asset_id',Blockchain.NATIVE_CURRENCY_SYMBOL)
-                if amt<=0:return jsonify({E:"Amount must be positive"}),400
-                tx=Transaction(self.node_wallet_for_operations.address,r,amt,aid)
+                from empower1.blockchain import constants as blockchain_constants
+                receiver_address=d['receiver_address']
+                amount_float=float(d['amount'])
+                asset_id=d.get('asset_id',blockchain_constants.NATIVE_CURRENCY_SYMBOL)
+
+                if amount_float<=0:return jsonify({E:"Amount must be positive"}),400
+                amount_atomic = blockchain_constants.to_atomic(amount_float)
+                # Assuming fee is 0 for debug tx, which is a valid int for Transaction constructor
+
+                tx=Transaction(self.node_wallet_for_operations.address, receiver_address, amount_atomic, asset_id)
                 tx.sign(self.node_wallet_for_operations)
+
                 if self.blockchain.add_transaction(tx,self.node_wallet_for_operations.get_public_key_hex()):
-                    return jsonify({M:"Tx created and added", "tx_id":tx.transaction_id}),201
+                    return jsonify({M:"Tx created and added", "tx_id":tx.transaction_id, "amount_atomic": amount_atomic}),201
                 else:return jsonify({M:"Failed to add tx (check node logs)"}),400
-            except ValueError:return jsonify({E:"Invalid amount"}),400
+            except ValueError:return jsonify({E:"Invalid amount format."}),400
             except Exception as e:return jsonify({E:f"Tx creation failed: {str(e)}"}),500
         @self.app.route('/debug_faucet', methods=['POST'])
         def debug_faucet_endpoint():
             d=request.get_json();E="error";M="message"
             if not d or'address'not in d or'amount'not in d:return jsonify({E:"Missing address/amount"}),400
             try:
-                ta=d['address'];amt=float(d['amount'])
-                if amt<=0:return jsonify({E:"Amount must be positive"}),400
-                self.blockchain.balances[ta]=self.blockchain.balances.get(ta,0.0)+amt
-                self.blockchain.total_supply_epc+=amt
-                return jsonify({M:"Faucet funds added", "address":ta,"new_balance":self.blockchain.balances[ta]}),200
-            except ValueError:return jsonify({E:"Invalid amount for faucet"}),400
+                from empower1.blockchain import constants as blockchain_constants
+                target_address=d['address']
+                amount_float=float(d['amount'])
+                if amount_float<=0:return jsonify({E:"Amount must be positive"}),400
+                amount_atomic = blockchain_constants.to_atomic(amount_float)
+
+                self.blockchain.balances[target_address]=self.blockchain.balances.get(target_address,0) + amount_atomic
+                self.blockchain.total_supply_epc+=amount_atomic # total_supply_epc is already atomic
+
+                new_bal_formatted = blockchain_constants.from_atomic(self.blockchain.balances[target_address])
+                return jsonify({
+                    M:"Faucet funds added",
+                    "address":target_address,
+                    "added_atomic": amount_atomic,
+                    "new_balance_atomic": self.blockchain.balances[target_address],
+                    "new_balance_formatted": f"{new_bal_formatted:.{blockchain_constants.DECIMALS}f} {blockchain_constants.NATIVE_CURRENCY_SYMBOL}"
+                }),200
+            except ValueError:return jsonify({E:"Invalid amount format for faucet."}),400
             except Exception as e:return jsonify({E:f"Faucet failed: {str(e)}"}),500
         @self.app.route('/mine_block_debug', methods=['POST'])
         def mine_block_debug_endpoint():
@@ -242,12 +266,14 @@ class Network:
                 if not tspk:print(f"DBG HRB: Tx Sender PK {tx.sender_address} not found. Known: {list(USER_PUBLIC_KEYS.keys())}", flush=True); return False
                 if not tx.verify_signature(tspk):print(f"DBG HRB: Tx sig fail {tx.transaction_id}", flush=True);return False
             if is_direct_extension:
-                tb=self.blockchain.balances.copy();vbt=True
+                tb=self.blockchain.balances.copy();vbt=True # Balances are now int
                 for tx in rb.transactions:
-                    if tx.asset_id==Blockchain.NATIVE_CURRENCY_SYMBOL:
-                        sb=tb.get(tx.sender_address,0.0)
+                    # Ensure constants is available or use self.blockchain.constants
+                    from empower1.blockchain import constants as net_constants
+                    if tx.asset_id==net_constants.NATIVE_CURRENCY_SYMBOL:
+                        sb=tb.get(tx.sender_address,0) # Use int default
                         if sb<tx.amount:vbt=False;break
-                        tb[tx.sender_address]=sb-tx.amount;tb[tx.receiver_address]=tb.get(tx.receiver_address,0.0)+tx.amount
+                        tb[tx.sender_address]=sb-tx.amount;tb[tx.receiver_address]=tb.get(tx.receiver_address,0)+tx.amount # Use int default
                 if not vbt:print(f"DBG HRB: Balance fail on temp check for block {rb.index}", flush=True);return False
                 orig_ni=self.blockchain.network_interface;self.blockchain.network_interface=None
                 for tx in rb.transactions:
@@ -339,10 +365,12 @@ class Network:
                     tspk=USER_PUBLIC_KEYS.get(tx.sender_address)
                     if not tspk: print(f"!!! DBG HCR Node {self.self_node.port}: Missing PK for Tx sender {tx.sender_address} in B{i}. My Keys: {list(USER_PUBLIC_KEYS.keys())}", flush=True); valid_pc=False; break
                     if not tx.verify_signature(tspk):print(f"!!! DBG HCR Node {self.self_node.port}: Invalid Tx {tx.transaction_id[:7]} in B{i}", flush=True);valid_pc=False;break
-                    if tx.asset_id==Blockchain.NATIVE_CURRENCY_SYMBOL:
-                        sb=temp_bals.get(tx.sender_address,0.0)
+
+                    from empower1.blockchain import constants as net_constants # Import constants
+                    if tx.asset_id==net_constants.NATIVE_CURRENCY_SYMBOL:
+                        sb=temp_bals.get(tx.sender_address,0) # Use int default
                         if sb<tx.amount:print(f"!!! DBG HCR Node {self.self_node.port}: Insuff funds Tx {tx.transaction_id[:7]} in B{i} (Bal:{sb} Amt:{tx.amount})", flush=True);valid_pc=False;break
-                        temp_bals[tx.sender_address]=sb-tx.amount;temp_bals[tx.receiver_address]=temp_bals.get(tx.receiver_address,0.0)+tx.amount
+                        temp_bals[tx.sender_address]=sb-tx.amount;temp_bals[tx.receiver_address]=temp_bals.get(tx.receiver_address,0)+tx.amount # Use int default
                 if not valid_pc:break
                 temp_validated_pc.append(cb)
 
@@ -356,11 +384,12 @@ class Network:
         elif not valid_pc: print(f"[{self.self_node.node_id}] Received chain from {fpn.address} was invalid during HCR validation.", flush=True)
 
 if __name__ == '__main__':
+    from empower1.blockchain import constants as main_constants # Import for main
     class DemoBlockchain:
         def __init__(self):
-            self.NATIVE_CURRENCY_SYMBOL = "EPC";self.total_supply_epc = 1_000_000.0
+            self.NATIVE_CURRENCY_SYMBOL = main_constants.NATIVE_CURRENCY_SYMBOL;self.total_supply_epc = 1_000_000.0 # total_supply will become atomic
             gv=Wallet();USER_PUBLIC_KEYS[gv.address]=gv.get_public_key_hex();VALIDATOR_WALLETS[gv.address]=gv
-            self.chain=[];self.balances={};gb=Block(0,[],time.time(),"0",gv.address)
+            self.chain=[];self.balances={};gb=Block(0,[],time.time(),"0",gv.address, proof="genesis_proof_network_main") # Added proof
             if gb:gb.sign_block(gv);self.chain.append(gb);self.balances[gv.address]=self.total_supply_epc
             self.pending_transactions=[];self.network_interface=None
             self.validator_manager = ValidatorManager()
