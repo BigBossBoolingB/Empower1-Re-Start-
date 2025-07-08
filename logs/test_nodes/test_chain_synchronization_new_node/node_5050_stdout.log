@@ -1,21 +1,21 @@
 Consensus package initialized.
 Network package initialized.
 ValidatorManager initialized. Min stake for active: 100000000
-New validator registered: Emp13dfdc41d8858871ee354ef0b3ca39ba6467b9500 with stake 500000000000 atomic units.
-Validator Emp13dfdc41d8858871ee354ef0b3ca39ba6467b9500 active status changed to: True (Stake: 500000000000)
-CMD_MAIN_DBG Node 5050: Node Wallet Address: Emp13dfdc41d8858871ee354ef0b3ca39ba6467b9500
-CMD_MAIN_DBG Node 5050: Blockchain Genesis Validator: Emp13dfdc41d8858871ee354ef0b3ca39ba6467b9500
+New validator registered: Emp137ff62af7d3ea5f0017f053bcadb9814b9f120fa with stake 500000000000 atomic units.
+Validator Emp137ff62af7d3ea5f0017f053bcadb9814b9f120fa active status changed to: True (Stake: 500000000000)
+CMD_MAIN_DBG Node 5050: Node Wallet Address: Emp137ff62af7d3ea5f0017f053bcadb9814b9f120fa
+CMD_MAIN_DBG Node 5050: Blockchain Genesis Validator: Emp137ff62af7d3ea5f0017f053bcadb9814b9f120fa
 CMD_MAIN_DBG Node 5050: Balance of Node Wallet: 1000000000000
 CMD_MAIN_DBG Node 5050: Balance of Genesis Validator: 1000000000000
 CMD_MAIN_DBG Node 5050: Is Node Wallet the Genesis Validator? True
  * Serving Flask app 'empower1.network.network'
  * Debug mode: off
-Validator Emp13dfdc41d8858871ee354ef0b3ca39ba6467b9500 stake updated to 500100000000 atomic units.
-Validator Emp13dfdc41d8858871ee354ef0b3ca39ba6467b9500 stake updated by/set to 100000000 atomic units. New balance: 999900000000
+Validator Emp137ff62af7d3ea5f0017f053bcadb9814b9f120fa stake updated to 500100000000 atomic units.
+Validator Emp137ff62af7d3ea5f0017f053bcadb9814b9f120fa stake updated by/set to 100000000 atomic units. New balance: 999900000000
 DEBUG MINE: 1 pending transactions found.
-Block #1 mined by Emp13dfdc41d8858871ee354ef0b3ca39ba6467b9500 with 1 txs.
+Block #1 mined by Emp137ff62af7d3ea5f0017f053bcadb9814b9f120fa with 1 txs.
 DEBUG MINE: 1 pending transactions found.
-Block #2 mined by Emp13dfdc41d8858871ee354ef0b3ca39ba6467b9500 with 1 txs.
+Block #2 mined by Emp137ff62af7d3ea5f0017f053bcadb9814b9f120fa with 1 txs.
 !!! DBG Node 5050: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5051
 !!! DBG Node 5050: connect_to_peer called for http://127.0.0.1:5051
 !!! DBG Node 5050: Attempting to add peer http://127.0.0.1:5051

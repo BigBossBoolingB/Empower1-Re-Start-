@@ -1,7 +1,7 @@
 Consensus package initialized.
 Network package initialized.
 ValidatorManager initialized. Min stake for active: 100000000
-New validator registered: Emp1f2a91cb79e9aabd5ce1a851a1220e82c98cb1f39 with stake 500000000000 atomic units.
-Validator Emp1f2a91cb79e9aabd5ce1a851a1220e82c98cb1f39 active status changed to: True (Stake: 500000000000)
+New validator registered: Emp19bbd21c7f46e8bf83631a565b6f40f05a22a47e9 with stake 500000000000 atomic units.
+Validator Emp19bbd21c7f46e8bf83631a565b6f40f05a22a47e9 active status changed to: True (Stake: 500000000000)
  * Serving Flask app 'empower1.network.network'
  * Debug mode: off

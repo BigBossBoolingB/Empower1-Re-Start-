@@ -6,9 +6,10 @@ import requests
 from empower1.blockchain.blockchain import Blockchain, USER_PUBLIC_KEYS, VALIDATOR_WALLETS
 from empower1.blockchain.transaction import Transaction
 from empower1.blockchain.block import Block
-from empower1.network.node import Node # This path should be correct
-from empower1.network.messages import MessageType # This path should be correct
+from empower1.network.node import Node
+from empower1.network.messages import MessageType
 from empower1.blockchain.wallet import Wallet
+from empower1.metrics import metrics_collector # Import global metrics collector
 
 class Network:
     def __init__(self, blockchain: Blockchain, host: str, port: int, node_id: str = None, seed_nodes: set = None, node_wallet: Wallet = None):
@@ -155,8 +156,74 @@ class Network:
             data = request.get_json()
             if not data or 'address' not in data: return jsonify({"error": "Missing peer address to connect to"}), 400
             peer_addr_to_connect = data['address']
-            if self.connect_to_peer(peer_addr_to_connect): return jsonify({"message": f"Conn attempt to {peer_addr_to_connect} success"}), 200
-            else: return jsonify({"message": f"Conn attempt to {peer_addr_to_connect} failed"}), 400
+
+            # Attempt to ping first
+            ping_response = self._send_http_request('GET', peer_addr_to_connect, '/ping')
+            if not (ping_response and ping_response.get("address") == peer_addr_to_connect):
+                return jsonify({"message": f"Ping to {peer_addr_to_connect} failed or invalid response."}), 400
+
+            try:
+                peer_node_obj = Node.from_address_string(peer_addr_to_connect)
+            except ValueError:
+                return jsonify({"error": f"Invalid peer address format: {peer_addr_to_connect}"}), 400
+
+            self.add_peer(peer_node_obj) # Add if not known, also triggers peer exchange.
+                                         # add_peer itself calls request_chain_from_peer if new and chain is short.
+
+            # Explicitly request chain if our chain is still short, even if peer was known.
+            # This ensures that if PKs were just added, we re-attempt sync.
+            if len(self.blockchain.chain) <= 1 and not self.syncing_in_progress:
+                print(f"!!! DBG DEBUG_CONN_ENDPOINT: Chain short for {self.self_node.address}, forcing request_chain_from_peer for {peer_node_obj.address}", flush=True)
+                # Run in a new thread to prevent blocking the API call if sync takes time
+                # However, for test simplicity, direct call might be okay if test has timeouts.
+                # Let's do direct for now, can optimize to thread later.
+                self.request_chain_from_peer(peer_node_obj)
+
+            # Announce self back if it was a new connection or to reinforce
+            self._announce_self_to_peer(peer_node_obj)
+
+            return jsonify({"message": f"Connection/sync process with {peer_addr_to_connect} initiated/re-evaluated."}), 200
+
+        @self.app.route('/debug_force_add_validator', methods=['POST'])
+        def debug_force_add_validator_endpoint():
+            data = request.get_json()
+            req_fields = ['wallet_address', 'public_key_hex', 'stake_atomic']
+            if not data or not all(field in data for field in req_fields):
+                return jsonify({"error": "Missing required fields: wallet_address, public_key_hex, stake_atomic"}), 400
+
+            try:
+                addr = data['wallet_address']
+                pk_hex = data['public_key_hex']
+                stake_atomic = int(data['stake_atomic'])
+
+                if addr not in USER_PUBLIC_KEYS:
+                    USER_PUBLIC_KEYS[addr] = pk_hex
+                # We don't create a full Wallet object here as we don't have the private key.
+                # VALIDATOR_WALLETS is for nodes that can *act* as validators.
+                # This endpoint is for making a node *aware* of an external validator.
+
+                validator_obj = self.blockchain.validator_manager.add_or_update_validator_stake(
+                    addr, pk_hex, stake_atomic
+                )
+                if validator_obj:
+                    # Ensure the validator is also in VALIDATOR_WALLETS if it's the node's own wallet,
+                    # though this debug endpoint is more for external validators.
+                    # If this node IS this validator, its wallet should already be in VALIDATOR_WALLETS.
+                    if self.node_wallet_for_operations and self.node_wallet_for_operations.address == addr:
+                        if addr not in VALIDATOR_WALLETS: # Should have been added at node init
+                             VALIDATOR_WALLETS[addr] = self.node_wallet_for_operations
+
+                    return jsonify({"message": f"Validator {addr} forced add/update in manager.",
+                                    "details": validator_obj.to_dict()}), 200
+                else:
+                    # add_or_update_validator_stake prints errors if it fails
+                    return jsonify({"error": f"Failed to add/update validator {addr} in manager (see node logs)."}), 500
+            except ValueError as ve:
+                return jsonify({"error": f"Invalid data: {str(ve)}"}), 400
+            except Exception as e:
+                import traceback
+                print(f"Force add validator exception: {traceback.format_exc()}", flush=True)
+                return jsonify({"error": f"Force add validator failed: {str(e)}"}), 500
 
     def start_server(self, threaded=True):
         if threaded:
@@ -282,6 +349,15 @@ class Network:
                         self.blockchain.network_interface=orig_ni; return False
                 self.blockchain.chain.append(rb);self.blockchain.network_interface=orig_ni
                 self.blockchain.pending_transactions=[ptx for ptx in self.blockchain.pending_transactions if ptx.transaction_id not in {t.transaction_id for t in rb.transactions}]
+
+                metrics_collector.record_block_received(rb.hash, self.self_node.node_id)
+                for tx in rb.transactions:
+                    metrics_collector.record_transaction_included(
+                        tx_id=tx.transaction_id,
+                        block_hash=rb.hash,
+                        node_id=self.self_node.node_id # Node that processed this received block
+                    )
+
                 if rb.hash not in self.seen_block_hashes_broadcast:self.broadcast_block(rb)
                 return True
             elif rb.index>=cl and not self.syncing_in_progress and self.peers:

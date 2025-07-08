@@ -1,0 +1,73 @@
+Consensus package initialized.
+Network package initialized.
+ValidatorManager initialized. Min stake for active: 100000000
+New validator registered: Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066 with stake 500000000000 atomic units.
+Validator Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066 active status changed to: True (Stake: 500000000000)
+ * Serving Flask app 'empower1.network.network'
+ * Debug mode: off
+!!! DBG Node 5062: connect_to_peer called for http://127.0.0.1:5061
+!!! DBG Node 5062: Attempting to add peer http://127.0.0.1:5061
+!!! DBG Node 5062: Added peer http://127.0.0.1:5061. Total: 1. Requesting their peers.
+!!! DBG Node 5062: connect_to_peer called for http://127.0.0.1:5060
+!!! DBG Node 5062: Attempting to add peer http://127.0.0.1:5060
+!!! DBG Node 5062: Added peer http://127.0.0.1:5060. Total: 2. Requesting their peers.
+!!! DBG Node 5062: Checking sync condition after adding http://127.0.0.1:5060. My chain len: 1, Sync in progress: False
+!!! DBG Node 5062: Chain short after adding peer http://127.0.0.1:5060, calling request_chain_from_peer.
+!!! DBG Node 5062: ENTERING request_chain_from_peer for peer http://127.0.0.1:5060
+!!! DBG HCR Node 5062: ENTERING handle_chain_response from peer http://127.0.0.1:5060. Chain length received: 1
+!!! DBG HCR Node 5062: My current chain length: 1. My USER_PUBLIC_KEYS dict ID: 140259487435712, Known keys for: ['Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066']
+!!! DBG HCR Node 5062: New node adopting new genesis ee218fa from validator Emp1d3ba0e0412db05814c365eadb15abb3893e26ba8.
+!!! DBG HCR Node 5062: Validating prospective block 0, Val: Emp1d3ba0e0412db05814c365eadb15abb3893e26ba8, Hash: ee218fa
+!!! DBG HCR Node 5062: Missing PK for B0 validator Emp1d3ba0e0412db05814c365eadb15abb3893e26ba8. My Keys: ['Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066']
+[Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066] Received chain from http://127.0.0.1:5060 was invalid during HCR validation.
+!!! DBG Node 5062: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5060
+!!! DBG Node 5062: connect_to_peer called for http://127.0.0.1:5060
+!!! DBG Node 5062: Attempting to add peer http://127.0.0.1:5060
+!!! DBG Node 5062: Peer http://127.0.0.1:5060 is self or already known.
+!!! DBG Node 5062: Checking sync condition after adding http://127.0.0.1:5061. My chain len: 1, Sync in progress: False
+!!! DBG Node 5062: Chain short after adding peer http://127.0.0.1:5061, calling request_chain_from_peer.
+!!! DBG Node 5062: ENTERING request_chain_from_peer for peer http://127.0.0.1:5061
+!!! DBG HCR Node 5062: ENTERING handle_chain_response from peer http://127.0.0.1:5061. Chain length received: 1
+!!! DBG HCR Node 5062: My current chain length: 1. My USER_PUBLIC_KEYS dict ID: 140259487435712, Known keys for: ['Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066']
+!!! DBG HCR Node 5062: New node adopting new genesis 6b2cc81 from validator Emp140fc1f1058e37ff45994a88cc759166c4659eb16.
+!!! DBG HCR Node 5062: Validating prospective block 0, Val: Emp140fc1f1058e37ff45994a88cc759166c4659eb16, Hash: 6b2cc81
+!!! DBG HCR Node 5062: Missing PK for B0 validator Emp140fc1f1058e37ff45994a88cc759166c4659eb16. My Keys: ['Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066']
+[Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066] Received chain from http://127.0.0.1:5061 was invalid during HCR validation.
+!!! DBG Node 5062: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5061
+!!! DBG Node 5062: connect_to_peer called for http://127.0.0.1:5061
+!!! DBG Node 5062: Attempting to add peer http://127.0.0.1:5061
+!!! DBG Node 5062: Peer http://127.0.0.1:5061 is self or already known.
+!!! DBG Node 5062: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5063
+!!! DBG Node 5062: connect_to_peer called for http://127.0.0.1:5063
+!!! DBG Node 5062: Attempting to add peer http://127.0.0.1:5063
+!!! DBG Node 5062: Added peer http://127.0.0.1:5063. Total: 3. Requesting their peers.
+!!! DBG Node 5062: Checking sync condition after adding http://127.0.0.1:5063. My chain len: 1, Sync in progress: False
+!!! DBG Node 5062: Chain short after adding peer http://127.0.0.1:5063, calling request_chain_from_peer.
+!!! DBG Node 5062: ENTERING request_chain_from_peer for peer http://127.0.0.1:5063
+!!! DBG HCR Node 5062: ENTERING handle_chain_response from peer http://127.0.0.1:5063. Chain length received: 1
+!!! DBG HCR Node 5062: My current chain length: 1. My USER_PUBLIC_KEYS dict ID: 140259487435712, Known keys for: ['Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066']
+!!! DBG HCR Node 5062: New node adopting new genesis 2647ac7 from validator Emp1eda1f9a7c1ecc816f1645530bf9ac3ff379272ec.
+!!! DBG HCR Node 5062: Validating prospective block 0, Val: Emp1eda1f9a7c1ecc816f1645530bf9ac3ff379272ec, Hash: 2647ac7
+!!! DBG HCR Node 5062: Missing PK for B0 validator Emp1eda1f9a7c1ecc816f1645530bf9ac3ff379272ec. My Keys: ['Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066']
+[Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066] Received chain from http://127.0.0.1:5063 was invalid during HCR validation.
+!!! DBG Node 5062: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5064
+!!! DBG Node 5062: connect_to_peer called for http://127.0.0.1:5064
+!!! DBG Node 5062: Attempting to add peer http://127.0.0.1:5064
+!!! DBG Node 5062: Added peer http://127.0.0.1:5064. Total: 4. Requesting their peers.
+!!! DBG Node 5062: Checking sync condition after adding http://127.0.0.1:5064. My chain len: 1, Sync in progress: False
+!!! DBG Node 5062: Chain short after adding peer http://127.0.0.1:5064, calling request_chain_from_peer.
+!!! DBG Node 5062: ENTERING request_chain_from_peer for peer http://127.0.0.1:5064
+!!! DBG HCR Node 5062: ENTERING handle_chain_response from peer http://127.0.0.1:5064. Chain length received: 1
+!!! DBG HCR Node 5062: My current chain length: 1. My USER_PUBLIC_KEYS dict ID: 140259487435712, Known keys for: ['Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066']
+!!! DBG HCR Node 5062: New node adopting new genesis 07e2d79 from validator Emp11a30371faa8136502ec7cf8e01bc17d7e18a744d.
+!!! DBG HCR Node 5062: Validating prospective block 0, Val: Emp11a30371faa8136502ec7cf8e01bc17d7e18a744d, Hash: 07e2d79
+!!! DBG HCR Node 5062: Missing PK for B0 validator Emp11a30371faa8136502ec7cf8e01bc17d7e18a744d. My Keys: ['Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066']
+[Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066] Received chain from http://127.0.0.1:5064 was invalid during HCR validation.
+!!! DBG Node 5062: Received /debug_add_user_public_key for Emp1d3ba0e0412db05814c365eadb15abb3893e26ba8
+!!! DBG Node 5062: USER_PUBLIC_KEYS dict ID: 140259487435712, Now contains: ['Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066', 'Emp1d3ba0e0412db05814c365eadb15abb3893e26ba8']
+!!! DBG Node 5062: Received /debug_add_user_public_key for Emp140fc1f1058e37ff45994a88cc759166c4659eb16
+!!! DBG Node 5062: USER_PUBLIC_KEYS dict ID: 140259487435712, Now contains: ['Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066', 'Emp1d3ba0e0412db05814c365eadb15abb3893e26ba8', 'Emp140fc1f1058e37ff45994a88cc759166c4659eb16']
+!!! DBG Node 5062: Received /debug_add_user_public_key for Emp1eda1f9a7c1ecc816f1645530bf9ac3ff379272ec
+!!! DBG Node 5062: USER_PUBLIC_KEYS dict ID: 140259487435712, Now contains: ['Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066', 'Emp1d3ba0e0412db05814c365eadb15abb3893e26ba8', 'Emp140fc1f1058e37ff45994a88cc759166c4659eb16', 'Emp1eda1f9a7c1ecc816f1645530bf9ac3ff379272ec']
+!!! DBG Node 5062: Received /debug_add_user_public_key for Emp11a30371faa8136502ec7cf8e01bc17d7e18a744d
+!!! DBG Node 5062: USER_PUBLIC_KEYS dict ID: 140259487435712, Now contains: ['Emp1fe3e2bda5d71768319457a264e0d1d2e5211b066', 'Emp1d3ba0e0412db05814c365eadb15abb3893e26ba8', 'Emp140fc1f1058e37ff45994a88cc759166c4659eb16', 'Emp1eda1f9a7c1ecc816f1645530bf9ac3ff379272ec', 'Emp11a30371faa8136502ec7cf8e01bc17d7e18a744d']

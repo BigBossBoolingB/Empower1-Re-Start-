@@ -91,11 +91,19 @@ The implications of EmPower1 Blockchain extend far beyond traditional finance an
 *   **Intelligent Redistribution Engine (IRE):** Placeholder modules for future AI/ML-driven economic balancing.
 *   **Smart Contract Placeholders:** Initial classes for conceptual smart contract functionality.
 *   **Basic Testing Framework:** `pytest` setup with unit tests covering core components, networking, and native currency logic.
+    *   Expanded integration tests (`tests/integration/test_full_network.py`) cover multi-node dynamic network formation, concurrent transaction scenarios, and basic chain synchronization.
 *   **Basic Networking:**
     *   Nodes can be started via `cmd/node/main.py`, each running an HTTP (Flask) server.
     *   Peer discovery via seed nodes and peer-to-peer exchange (`/GET_PEERS`, `/NEW_PEER_ANNOUNCE`).
     *   Transaction and block propagation: Nodes broadcast new transactions and blocks to peers. Received items are validated and added to the local state.
     *   Basic chain synchronization: New nodes (or nodes on shorter forks) can request the full chain from a peer and adopt the longest valid chain.
+*   **Basic Performance Metrics:**
+    *   An in-memory `MetricsCollector` (`empower1/metrics.py`) is implemented to track:
+        *   Transaction submission and inclusion times (for latency).
+        *   Block mining and reception events.
+        *   API call counts and timings (basic setup).
+    *   Integration tests (`test_full_network.py`) can report summaries like average transaction latency, block time, and transactions per block.
+    *   The CLI node (`cmd/node/main.py`) has a `metrics` command to display a live summary of these collected metrics.
 
 ### 5.2. Getting Started with Development
 

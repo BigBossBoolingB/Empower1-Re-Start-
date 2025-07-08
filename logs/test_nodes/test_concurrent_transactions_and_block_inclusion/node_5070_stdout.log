@@ -1,0 +1,51 @@
+Consensus package initialized.
+Network package initialized.
+ValidatorManager initialized. Min stake for active: 100000000
+New validator registered: Emp1667a2eff1105eecbf38f637eb4519d7c11caf0e0 with stake 500000000000 atomic units.
+Validator Emp1667a2eff1105eecbf38f637eb4519d7c11caf0e0 active status changed to: True (Stake: 500000000000)
+ * Serving Flask app 'empower1.network.network'
+ * Debug mode: off
+!!! DBG Node 5070: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5071
+!!! DBG Node 5070: connect_to_peer called for http://127.0.0.1:5071
+!!! DBG Node 5070: Attempting to add peer http://127.0.0.1:5071
+!!! DBG Node 5070: Added peer http://127.0.0.1:5071. Total: 1. Requesting their peers.
+!!! DBG Node 5070: Checking sync condition after adding http://127.0.0.1:5071. My chain len: 1, Sync in progress: False
+!!! DBG Node 5070: Chain short after adding peer http://127.0.0.1:5071, calling request_chain_from_peer.
+!!! DBG Node 5070: ENTERING request_chain_from_peer for peer http://127.0.0.1:5071
+!!! DBG HCR Node 5070: ENTERING handle_chain_response from peer http://127.0.0.1:5071. Chain length received: 1
+!!! DBG HCR Node 5070: My current chain length: 1. My USER_PUBLIC_KEYS dict ID: 140321466223488, Known keys for: ['Emp1667a2eff1105eecbf38f637eb4519d7c11caf0e0']
+!!! DBG HCR Node 5070: New node adopting new genesis 82fc8cb from validator Emp16bd19b394adc019ab40fd031bf64539f262f9add.
+!!! DBG HCR Node 5070: Validating prospective block 0, Val: Emp16bd19b394adc019ab40fd031bf64539f262f9add, Hash: 82fc8cb
+!!! DBG HCR Node 5070: Missing PK for B0 validator Emp16bd19b394adc019ab40fd031bf64539f262f9add. My Keys: ['Emp1667a2eff1105eecbf38f637eb4519d7c11caf0e0']
+[Emp1667a2eff1105eecbf38f637eb4519d7c11caf0e0] Received chain from http://127.0.0.1:5071 was invalid during HCR validation.
+!!! DBG Node 5070: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5072
+!!! DBG Node 5070: connect_to_peer called for http://127.0.0.1:5072
+!!! DBG Node 5070: Attempting to add peer http://127.0.0.1:5072
+!!! DBG Node 5070: Added peer http://127.0.0.1:5072. Total: 2. Requesting their peers.
+!!! DBG Node 5070: Checking sync condition after adding http://127.0.0.1:5072. My chain len: 1, Sync in progress: False
+!!! DBG Node 5070: Chain short after adding peer http://127.0.0.1:5072, calling request_chain_from_peer.
+!!! DBG Node 5070: ENTERING request_chain_from_peer for peer http://127.0.0.1:5072
+!!! DBG HCR Node 5070: ENTERING handle_chain_response from peer http://127.0.0.1:5072. Chain length received: 1
+!!! DBG HCR Node 5070: My current chain length: 1. My USER_PUBLIC_KEYS dict ID: 140321466223488, Known keys for: ['Emp1667a2eff1105eecbf38f637eb4519d7c11caf0e0']
+!!! DBG HCR Node 5070: New node adopting new genesis 968289d from validator Emp16f164a2c72728ecdb2b209d840469173bc1383a1.
+!!! DBG HCR Node 5070: Validating prospective block 0, Val: Emp16f164a2c72728ecdb2b209d840469173bc1383a1, Hash: 968289d
+!!! DBG HCR Node 5070: Missing PK for B0 validator Emp16f164a2c72728ecdb2b209d840469173bc1383a1. My Keys: ['Emp1667a2eff1105eecbf38f637eb4519d7c11caf0e0']
+[Emp1667a2eff1105eecbf38f637eb4519d7c11caf0e0] Received chain from http://127.0.0.1:5072 was invalid during HCR validation.
+!!! DBG Node 5070: Received /debug_add_user_public_key for Emp16bd19b394adc019ab40fd031bf64539f262f9add
+!!! DBG Node 5070: USER_PUBLIC_KEYS dict ID: 140321466223488, Now contains: ['Emp1667a2eff1105eecbf38f637eb4519d7c11caf0e0', 'Emp16bd19b394adc019ab40fd031bf64539f262f9add']
+!!! DBG Node 5070: Received /debug_add_user_public_key for Emp16f164a2c72728ecdb2b209d840469173bc1383a1
+!!! DBG Node 5070: USER_PUBLIC_KEYS dict ID: 140321466223488, Now contains: ['Emp1667a2eff1105eecbf38f637eb4519d7c11caf0e0', 'Emp16bd19b394adc019ab40fd031bf64539f262f9add', 'Emp16f164a2c72728ecdb2b209d840469173bc1383a1']
+!!! DBG Node 5070: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5071
+!!! DBG Node 5070: connect_to_peer called for http://127.0.0.1:5071
+!!! DBG Node 5070: Attempting to add peer http://127.0.0.1:5071
+!!! DBG Node 5070: Peer http://127.0.0.1:5071 is self or already known.
+!!! DBG Node 5070: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5072
+!!! DBG Node 5070: connect_to_peer called for http://127.0.0.1:5072
+!!! DBG Node 5070: Attempting to add peer http://127.0.0.1:5072
+!!! DBG Node 5070: Peer http://127.0.0.1:5072 is self or already known.
+DBG Net Req Fail: POST http://127.0.0.1:5071/NEW_TRANSACTION -> 400 Client Error: BAD REQUEST for url: http://127.0.0.1:5071/NEW_TRANSACTION
+DBG Net Req Fail: POST http://127.0.0.1:5072/NEW_TRANSACTION -> 400 Client Error: BAD REQUEST for url: http://127.0.0.1:5072/NEW_TRANSACTION
+DEBUG MINE: 1 pending transactions found.
+Block #1 mined by Emp1667a2eff1105eecbf38f637eb4519d7c11caf0e0 with 1 txs.
+DBG Net Req Fail: POST http://127.0.0.1:5071/NEW_BLOCK -> 400 Client Error: BAD REQUEST for url: http://127.0.0.1:5071/NEW_BLOCK
+DBG Net Req Fail: POST http://127.0.0.1:5072/NEW_BLOCK -> 400 Client Error: BAD REQUEST for url: http://127.0.0.1:5072/NEW_BLOCK

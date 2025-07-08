@@ -1,12 +1,12 @@
 Consensus package initialized.
 Network package initialized.
 ValidatorManager initialized. Min stake for active: 100000000
-New validator registered: Emp13ce45b8f962c90cacaa0b2250f97c68b654c63d2 with stake 500000000000 atomic units.
-Validator Emp13ce45b8f962c90cacaa0b2250f97c68b654c63d2 active status changed to: True (Stake: 500000000000)
+New validator registered: Emp1a80cd8f7b0244050b9fb59f4e2111073426792eb with stake 500000000000 atomic units.
+Validator Emp1a80cd8f7b0244050b9fb59f4e2111073426792eb active status changed to: True (Stake: 500000000000)
  * Serving Flask app 'empower1.network.network'
  * Debug mode: off
-!!! DBG Node 5051: Received /debug_add_user_public_key for Emp13dfdc41d8858871ee354ef0b3ca39ba6467b9500
-!!! DBG Node 5051: USER_PUBLIC_KEYS dict ID: 140594534448064, Now contains: ['Emp13ce45b8f962c90cacaa0b2250f97c68b654c63d2', 'Emp13dfdc41d8858871ee354ef0b3ca39ba6467b9500']
+!!! DBG Node 5051: Received /debug_add_user_public_key for Emp137ff62af7d3ea5f0017f053bcadb9814b9f120fa
+!!! DBG Node 5051: USER_PUBLIC_KEYS dict ID: 140576653921408, Now contains: ['Emp1a80cd8f7b0244050b9fb59f4e2111073426792eb', 'Emp137ff62af7d3ea5f0017f053bcadb9814b9f120fa']
 !!! DBG Node 5051: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5050
 !!! DBG Node 5051: connect_to_peer called for http://127.0.0.1:5050
 !!! DBG Node 5051: Attempting to add peer http://127.0.0.1:5050
@@ -15,12 +15,12 @@ Validator Emp13ce45b8f962c90cacaa0b2250f97c68b654c63d2 active status changed to:
 !!! DBG Node 5051: Chain short after adding peer http://127.0.0.1:5050, calling request_chain_from_peer.
 !!! DBG Node 5051: ENTERING request_chain_from_peer for peer http://127.0.0.1:5050
 !!! DBG HCR Node 5051: ENTERING handle_chain_response from peer http://127.0.0.1:5050. Chain length received: 3
-!!! DBG HCR Node 5051: My current chain length: 1. My USER_PUBLIC_KEYS dict ID: 140594534448064, Known keys for: ['Emp13ce45b8f962c90cacaa0b2250f97c68b654c63d2', 'Emp13dfdc41d8858871ee354ef0b3ca39ba6467b9500']
-!!! DBG HCR Node 5051: New node adopting new genesis b9fb359 from validator Emp13dfdc41d8858871ee354ef0b3ca39ba6467b9500.
-!!! DBG HCR Node 5051: Validating prospective block 0, Val: Emp13dfdc41d8858871ee354ef0b3ca39ba6467b9500, Hash: b9fb359
-!!! DBG HCR Node 5051: Validating prospective block 1, Val: Emp13dfdc41d8858871ee354ef0b3ca39ba6467b9500, Hash: 5984517
-!!! DBG HCR Node 5051: Validating prospective block 2, Val: Emp13dfdc41d8858871ee354ef0b3ca39ba6467b9500, Hash: c793c3a
-[Emp13ce45b8f962c90cacaa0b2250f97c68b654c63d2] Received valid longer chain from http://127.0.0.1:5050 (len 3). Updating local chain (len 1).
+!!! DBG HCR Node 5051: My current chain length: 1. My USER_PUBLIC_KEYS dict ID: 140576653921408, Known keys for: ['Emp1a80cd8f7b0244050b9fb59f4e2111073426792eb', 'Emp137ff62af7d3ea5f0017f053bcadb9814b9f120fa']
+!!! DBG HCR Node 5051: New node adopting new genesis 66f3b5b from validator Emp137ff62af7d3ea5f0017f053bcadb9814b9f120fa.
+!!! DBG HCR Node 5051: Validating prospective block 0, Val: Emp137ff62af7d3ea5f0017f053bcadb9814b9f120fa, Hash: 66f3b5b
+!!! DBG HCR Node 5051: Validating prospective block 1, Val: Emp137ff62af7d3ea5f0017f053bcadb9814b9f120fa, Hash: 76be1dd
+!!! DBG HCR Node 5051: Validating prospective block 2, Val: Emp137ff62af7d3ea5f0017f053bcadb9814b9f120fa, Hash: f43ce47
+[Emp1a80cd8f7b0244050b9fb59f4e2111073426792eb] Received valid longer chain from http://127.0.0.1:5050 (len 3). Updating local chain (len 1).
 !!! DBG Node 5051: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5050
 !!! DBG Node 5051: connect_to_peer called for http://127.0.0.1:5050
 !!! DBG Node 5051: Attempting to add peer http://127.0.0.1:5050

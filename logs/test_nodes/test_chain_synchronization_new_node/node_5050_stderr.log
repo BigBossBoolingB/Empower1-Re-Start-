@@ -1,17 +1,17 @@
 INFO:werkzeug:[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on http://127.0.0.1:5050
 INFO:werkzeug:[33mPress CTRL+C to quit[0m
-INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 16:45:17] "GET /ping HTTP/1.1" 200 -
-INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 16:45:17] "GET /ping HTTP/1.1" 200 -
-INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 16:45:17] "POST /debug_stake_self HTTP/1.1" 200 -
-INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 16:45:17] "[35m[1mPOST /debug_create_tx HTTP/1.1[0m" 201 -
-INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 16:45:17] "POST /mine_block_debug HTTP/1.1" 200 -
-INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 16:45:18] "[35m[1mPOST /debug_create_tx HTTP/1.1[0m" 201 -
-INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 16:45:18] "POST /mine_block_debug HTTP/1.1" 200 -
-INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 16:45:19] "GET /GET_CHAIN HTTP/1.1" 200 -
-INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 16:45:19] "GET /debug_get_user_public_keys HTTP/1.1" 200 -
-INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 16:45:19] "GET /ping HTTP/1.1" 200 -
-INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 16:45:19] "GET /GET_PEERS HTTP/1.1" 200 -
-INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 16:45:19] "GET /GET_CHAIN HTTP/1.1" 200 -
-INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 16:45:19] "GET /ping HTTP/1.1" 200 -
-INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 16:45:19] "[35m[1mPOST /NEW_PEER_ANNOUNCE HTTP/1.1[0m" 202 -
+INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 18:01:43] "GET /ping HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 18:01:43] "GET /ping HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 18:01:43] "POST /debug_stake_self HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 18:01:43] "[35m[1mPOST /debug_create_tx HTTP/1.1[0m" 201 -
+INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 18:01:43] "POST /mine_block_debug HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 18:01:44] "[35m[1mPOST /debug_create_tx HTTP/1.1[0m" 201 -
+INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 18:01:44] "POST /mine_block_debug HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 18:01:45] "GET /GET_CHAIN HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 18:01:45] "GET /debug_get_user_public_keys HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 18:01:45] "GET /ping HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 18:01:45] "GET /GET_PEERS HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 18:01:45] "GET /GET_CHAIN HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 18:01:45] "GET /ping HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [07/Jul/2025 18:01:45] "[35m[1mPOST /NEW_PEER_ANNOUNCE HTTP/1.1[0m" 202 -

@@ -5,6 +5,7 @@ from .transaction import Transaction  # Updated to relative import
 from .wallet import Wallet  # Updated to relative import
 import logging # Added import logging
 from . import constants # Import new constants file
+from empower1.metrics import metrics_collector # Import global metrics collector
 
 USER_PUBLIC_KEYS = {}
 VALIDATOR_WALLETS = {}
@@ -136,6 +137,7 @@ class Blockchain:
             return True # Already known
 
         self.pending_transactions.append(transaction)
+        metrics_collector.record_transaction_submission(transaction.transaction_id) # Record submission
 
         if self.network_interface and not received_from_network:
             self.network_interface.broadcast_transaction(transaction)
@@ -219,6 +221,20 @@ class Blockchain:
 
         # The ValidatorManager's select_next_validator method already calls record_block_production on the validator object.
         # So, no explicit call needed here.
+
+        # Record metrics for mined block and included transactions
+        metrics_collector.record_block_mined(
+            block_hash=new_block.hash,
+            timestamp=new_block.timestamp,
+            node_id=self.node_wallet.address, # Assuming node_wallet's address is the node_id for mining
+            num_txs=len(new_block.transactions)
+        )
+        for tx in new_block.transactions:
+            metrics_collector.record_transaction_included(
+                tx_id=tx.transaction_id,
+                block_hash=new_block.hash,
+                node_id=self.node_wallet.address
+            )
 
         if self.network_interface:
             self.network_interface.broadcast_block(new_block)

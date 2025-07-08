@@ -1,8 +1,8 @@
 Consensus package initialized.
 Network package initialized.
 ValidatorManager initialized. Min stake for active: 100000000
-New validator registered: Emp1bb82199e2f48260a7b1e16ef645c38af22bc5eee with stake 500000000000 atomic units.
-Validator Emp1bb82199e2f48260a7b1e16ef645c38af22bc5eee active status changed to: True (Stake: 500000000000)
+New validator registered: Emp18eb6284efb65aff7f64a0bb3117d57efe75ae6fc with stake 500000000000 atomic units.
+Validator Emp18eb6284efb65aff7f64a0bb3117d57efe75ae6fc active status changed to: True (Stake: 500000000000)
  * Serving Flask app 'empower1.network.network'
  * Debug mode: off
 !!! DBG Node 5042: connect_to_peer called for http://127.0.0.1:5041
@@ -15,11 +15,11 @@ Validator Emp1bb82199e2f48260a7b1e16ef645c38af22bc5eee active status changed to:
 !!! DBG Node 5042: Chain short after adding peer http://127.0.0.1:5040, calling request_chain_from_peer.
 !!! DBG Node 5042: ENTERING request_chain_from_peer for peer http://127.0.0.1:5040
 !!! DBG HCR Node 5042: ENTERING handle_chain_response from peer http://127.0.0.1:5040. Chain length received: 1
-!!! DBG HCR Node 5042: My current chain length: 1. My USER_PUBLIC_KEYS dict ID: 140206411856960, Known keys for: ['Emp1bb82199e2f48260a7b1e16ef645c38af22bc5eee']
-!!! DBG HCR Node 5042: New node adopting new genesis dbe52bc from validator Emp1e1f54d000dd57a3a14309d88b50b8c0d3ec09d97.
-!!! DBG HCR Node 5042: Validating prospective block 0, Val: Emp1e1f54d000dd57a3a14309d88b50b8c0d3ec09d97, Hash: dbe52bc
-!!! DBG HCR Node 5042: Missing PK for B0 validator Emp1e1f54d000dd57a3a14309d88b50b8c0d3ec09d97. My Keys: ['Emp1bb82199e2f48260a7b1e16ef645c38af22bc5eee']
-[Emp1bb82199e2f48260a7b1e16ef645c38af22bc5eee] Received chain from http://127.0.0.1:5040 was invalid during HCR validation.
+!!! DBG HCR Node 5042: My current chain length: 1. My USER_PUBLIC_KEYS dict ID: 140416218319808, Known keys for: ['Emp18eb6284efb65aff7f64a0bb3117d57efe75ae6fc']
+!!! DBG HCR Node 5042: New node adopting new genesis 41b46d2 from validator Emp1b888c998b5186a33b7b73dbfb0daaa6851a76683.
+!!! DBG HCR Node 5042: Validating prospective block 0, Val: Emp1b888c998b5186a33b7b73dbfb0daaa6851a76683, Hash: 41b46d2
+!!! DBG HCR Node 5042: Missing PK for B0 validator Emp1b888c998b5186a33b7b73dbfb0daaa6851a76683. My Keys: ['Emp18eb6284efb65aff7f64a0bb3117d57efe75ae6fc']
+[Emp18eb6284efb65aff7f64a0bb3117d57efe75ae6fc] Received chain from http://127.0.0.1:5040 was invalid during HCR validation.
 !!! DBG Node 5042: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5040
 !!! DBG Node 5042: connect_to_peer called for http://127.0.0.1:5040
 !!! DBG Node 5042: Attempting to add peer http://127.0.0.1:5040
@@ -28,11 +28,11 @@ Validator Emp1bb82199e2f48260a7b1e16ef645c38af22bc5eee active status changed to:
 !!! DBG Node 5042: Chain short after adding peer http://127.0.0.1:5041, calling request_chain_from_peer.
 !!! DBG Node 5042: ENTERING request_chain_from_peer for peer http://127.0.0.1:5041
 !!! DBG HCR Node 5042: ENTERING handle_chain_response from peer http://127.0.0.1:5041. Chain length received: 1
-!!! DBG HCR Node 5042: My current chain length: 1. My USER_PUBLIC_KEYS dict ID: 140206411856960, Known keys for: ['Emp1bb82199e2f48260a7b1e16ef645c38af22bc5eee']
-!!! DBG HCR Node 5042: New node adopting new genesis 3bbcf2f from validator Emp1a3d1ba5d3fcac0304aac03c357480cd9bb38ea84.
-!!! DBG HCR Node 5042: Validating prospective block 0, Val: Emp1a3d1ba5d3fcac0304aac03c357480cd9bb38ea84, Hash: 3bbcf2f
-!!! DBG HCR Node 5042: Missing PK for B0 validator Emp1a3d1ba5d3fcac0304aac03c357480cd9bb38ea84. My Keys: ['Emp1bb82199e2f48260a7b1e16ef645c38af22bc5eee']
-[Emp1bb82199e2f48260a7b1e16ef645c38af22bc5eee] Received chain from http://127.0.0.1:5041 was invalid during HCR validation.
+!!! DBG HCR Node 5042: My current chain length: 1. My USER_PUBLIC_KEYS dict ID: 140416218319808, Known keys for: ['Emp18eb6284efb65aff7f64a0bb3117d57efe75ae6fc']
+!!! DBG HCR Node 5042: New node adopting new genesis 3ee6fb1 from validator Emp17e2bad81fd0ca15a4909531491a39372d47ac310.
+!!! DBG HCR Node 5042: Validating prospective block 0, Val: Emp17e2bad81fd0ca15a4909531491a39372d47ac310, Hash: 3ee6fb1
+!!! DBG HCR Node 5042: Missing PK for B0 validator Emp17e2bad81fd0ca15a4909531491a39372d47ac310. My Keys: ['Emp18eb6284efb65aff7f64a0bb3117d57efe75ae6fc']
+[Emp18eb6284efb65aff7f64a0bb3117d57efe75ae6fc] Received chain from http://127.0.0.1:5041 was invalid during HCR validation.
 !!! DBG Node 5042: Received NEW_PEER_ANNOUNCE for http://127.0.0.1:5041
 !!! DBG Node 5042: connect_to_peer called for http://127.0.0.1:5041
 !!! DBG Node 5042: Attempting to add peer http://127.0.0.1:5041

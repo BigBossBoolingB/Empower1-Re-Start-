@@ -35,6 +35,7 @@ def print_help():
     print("  mywallet                                     - Display this node's wallet info")
     print("  stake <amount>                               - Register/update stake for this node's wallet")
     print("  validators                                   - Display current validator set information")
+    print("  metrics                                      - Display collected performance metrics")
     print("  help                                         - Show this help message")
     print("  exit                                         - Shutdown the node")
     print("-" * 40)
@@ -215,6 +216,25 @@ def main():
                             print("  No validators currently registered in the manager.")
                     else:
                         print("  ValidatorManager not available or no validators.")
+                    print("-" * 40)
+                elif command == "metrics":
+                    from empower1.metrics import metrics_collector # Import it here for the command
+                    print("\n--- Node Performance Metrics ---")
+                    avg_latency = metrics_collector.get_average_transaction_latency()
+                    avg_block_time = metrics_collector.get_average_block_time()
+                    avg_tx_block = metrics_collector.get_average_tx_per_block()
+
+                    print(f"  Avg Tx Latency: {avg_latency:.4f}s" if avg_latency is not None else "  Avg Tx Latency: N/A")
+                    print(f"  Avg Block Time: {avg_block_time:.4f}s" if avg_block_time is not None else "  Avg Block Time: N/A")
+                    print(f"  Avg Txs/Block: {avg_tx_block:.2f}" if avg_tx_block is not None else "  Avg Txs/Block: N/A")
+
+                    print("\n  API Call Summary:")
+                    api_summary = metrics_collector.get_api_summary()
+                    if api_summary:
+                        for endpoint, data in api_summary.items():
+                            print(f"    {endpoint}: Count={data['count']}, AvgDuration={data['avg_duration_ms']:.2f}ms")
+                    else:
+                        print("    No API calls recorded.")
                     print("-" * 40)
                 else: print(f"Unknown command: {command}. Type 'help'.")
             except EOFError: running = False; print("\nShutting down (EOF)...")
